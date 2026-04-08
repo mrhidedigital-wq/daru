@@ -19,7 +19,7 @@ export class GeminiProvider extends BaseLLMProvider {
   }
 
   async complete({ system, prompt, temperature, max_tokens } = {}) {
-    const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
+    const serverUrl = process.env.REACT_APP_SERVER_URL || '';
 
     const response = await fetch(`${serverUrl}/api/llm/complete`, {
       method: 'POST',

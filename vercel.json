@@ -1,0 +1,29 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "framework": "create-react-app",
+
+  "functions": {
+    "api/veo/generate.js":  { "maxDuration": 30 },
+    "api/veo/poll.js":      { "maxDuration": 30 },
+    "api/veo/extend.js":    { "maxDuration": 30 },
+    "api/llm/complete.js":  { "maxDuration": 30 },
+    "api/export.js":        { "maxDuration": 60 }
+  },
+
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin",  "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type,Authorization" }
+      ]
+    }
+  ]
+}

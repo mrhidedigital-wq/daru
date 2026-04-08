@@ -106,7 +106,7 @@ async function pollUntilDone(checkFn, intervalMs = 8000, maxAttempts = 60) {
 //   Extensión 4: 29 + 7 = 36s → trim a 30s
 //
 async function extendWithVeo({ videoUrl, gcsUri, prompt, aspectRatio, targetSeconds, projectId, vertexToken, turnaroundUrls = [] }) {
-  const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
+  const serverUrl = process.env.REACT_APP_SERVER_URL || '';
 
   // Calcular cuántas extensiones necesitamos
   const BASE_SECONDS = 8;
@@ -377,7 +377,7 @@ async function generateWithVeo({ prompt, startUrl, endUrl, turnaround, aspectRat
   };
 
   // Endpoints y headers según modo de autenticación
-  const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
+  const serverUrl = process.env.REACT_APP_SERVER_URL || '';
 
   if (useVertex) {
     // ── Modo Vertex AI via proxy backend (evita CORS) ──
