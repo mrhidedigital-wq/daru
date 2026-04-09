@@ -163,8 +163,7 @@ export async function urlToInlineData(url) {
 // aspectRatio: '16:9' | '9:16'
 // ============================================================
 export async function generateImageWithGemini(prompt, refImages = [], aspectRatio = '16:9') {
-  const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-  const endpoint = `${serverUrl}/api/gemini/proxy/gemini-2.5-flash-image`;
+  const endpoint = '/api/gemini/proxy';
 
   // ── Orden: imágenes primero, texto al final (Google docs) ─────
   const userParts = [];
@@ -213,8 +212,7 @@ export async function generateImageWithGemini(prompt, refImages = [], aspectRati
 //   Turn 1 model: [imagen frontal]
 //   Turn 2 user:  "cambia el ángulo a lateral derecho"  ← Gemini edita
 export async function generateImageWithConversation(frontalPrompt, frontalImage, editPrompt, aspectRatio = '16:9') {
-  const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-  const endpoint = `${serverUrl}/api/gemini/proxy/gemini-2.5-flash-image`;
+  const endpoint = '/api/gemini/proxy';
 
   // Convertir la imagen frontal a inline data
   const frontalInline = await urlToInlineData(frontalImage);
