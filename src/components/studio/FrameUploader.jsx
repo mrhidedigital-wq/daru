@@ -1,9 +1,11 @@
 // src/components/studio/FrameUploader.jsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { characterStorage, shotStorage } from '../../lib/supabase/storage';
 import { characterAssetsDB }             from '../../lib/supabase/database';
+import { supabase }                      from '../../lib/supabase/client';
 import DropZone                          from './DropZone';
 import TurnaroundSlot                    from './TurnaroundSlot';
+import ManualPromptSection               from './ManualPromptSection';
 
 const C = {
   bg:      '#2A2A2A',
@@ -44,10 +46,66 @@ export default function FrameUploader({
   const [motionRef,     setMotionRef]     = useState(null);
   const [uploading,     setUploading]     = useState({});
   const [error,         setError]         = useState(null);
+  const [customPrompt,  setCustomPrompt]  = useState(shot?.customPrompt || '');
+  const [showPrompt,    setShowPrompt]    = useState(!!(shot?.customPrompt));
   const [dialogue,      setDialogue]      = useState(shot?.dialogue || '');
   const [showDialogue,  setShowDialogue]  = useState(!!(shot?.dialogue));
+  const [loadingAssets, setLoadingAssets] = useState(false);
+  const [subjectData,   setSubjectData]   = useState([]);  // subjects cargados de AssetManager
+  const [sceneData,     setSceneData]     = useState([]);  // scenes cargadas de AssetManager
   const [sameScene,     setScene]         = useState(false);
   const [subjectType,   setSubjectType]   = useState(null); // 'person' | 'animal' | 'object' | null
+
+  // ── Cargar sujetos y escenas de AssetManager al montar ──────
+  useEffect(() => {
+    if (!projectId) return;
+    const loadAssets = async () => {
+      setLoadingAssets(true);
+      try {
+        const { data: subjects } = await supabase
+          .from('subject_assets')
+          .select('id, name, description, view_front_url, view_three_quarter_url, view_side_url')
+          .eq('project_id', projectId)
+          .limit(5);
+
+        if (subjects?.length > 0) {
+          const assetChars = subjects.map((s, i) => ({
+            id:    `asset_${s.id}`,
+            name:  s.name || `Personaje ${i + 1}`,
+            role:  i === 0 ? 'principal' : 'secundario',
+            fromAsset: true,
+            images: {
+              front:         s.view_front_url         || null,
+              three_quarter: s.view_three_quarter_url || null,
+              profile:       s.view_side_url          || null,
+            },
+          }));
+          setSubjectData(subjects);
+          const existingHasImages = characters.some(c =>
+            Object.values(c.images || {}).some(Boolean)
+          );
+          if (!existingHasImages) {
+            setCharacters(assetChars);
+            notifyChange({ characters: assetChars });
+          }
+        }
+
+        const { data: scenes } = await supabase
+          .from('scene_assets')
+          .select('id, name, description, image_url, image_url_lateral_der, image_url_lateral_izq, image_url_back')
+          .eq('project_id', projectId)
+          .limit(5);
+        if (scenes?.length > 0) setSceneData(scenes);
+
+      } catch (e) {
+        console.warn('[FrameUploader] No se pudieron cargar assets:', e.message);
+      } finally {
+        setLoadingAssets(false);
+      }
+    };
+    loadAssets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   // ── Validar archivo ────────────────────────────────────────
   const validateFile = (file) => {
@@ -136,6 +194,7 @@ export default function FrameUploader({
       action,
       frameMode,
       characters,
+      customPrompt,
       dialogue,
       sameScene,
       subjectType,
@@ -352,7 +411,10 @@ export default function FrameUploader({
       <div style={styles.sectionHeader}>
         <span style={styles.sectionLabel}>PERSONAJES</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-{characters.some(c => c.fromAsset) && (
+          {loadingAssets && (
+            <span style={{ fontSize: 8, color: C.accent, fontFamily: 'monospace' }}>⟳ cargando assets...</span>
+          )}
+          {characters.some(c => c.fromAsset) && (
             <span style={{ fontSize: 8, color: '#9B59B6', fontFamily: 'monospace', background: 'rgba(155,89,182,0.12)', padding: '1px 6px', borderRadius: 8 }}>
               🎨 ASSET MANAGER
             </span>
@@ -558,6 +620,35 @@ export default function FrameUploader({
             onChange={e => { const f = e.target.files?.[0]; if (f) uploadMotionRef(f); e.target.value = ''; }}
           />
         </>
+      )}
+
+      {/* ── PROMPT MANUAL (con IA integrada) ─────────────────── */}
+      <div style={styles.sectionHeader}>
+        <span style={styles.sectionLabel}>PROMPT MANUAL</span>
+        <button
+          onClick={() => setShowPrompt(p => !p)}
+          style={{
+            background: showPrompt ? 'rgba(255,184,0,0.15)' : 'transparent',
+            border: `1px solid ${showPrompt ? C.warning : C.border}`,
+            borderRadius: 4, color: showPrompt ? C.warning : C.muted,
+            padding: '2px 10px', fontSize: 9, fontWeight: 700,
+            letterSpacing: '0.08em', cursor: 'pointer', fontFamily: 'monospace',
+          }}
+        >
+          {showPrompt ? '● ACTIVO' : '○ OPCIONAL'}
+        </button>
+      </div>
+
+      {showPrompt && (
+        <ManualPromptSection
+          mediaProvider={mediaProvider}
+          subjectData={subjectData}
+          sceneData={sceneData}
+          projectId={projectId}
+          customPrompt={customPrompt}
+          onPromptChange={(text) => { setCustomPrompt(text); notifyChange({ customPrompt: text }); }}
+          onClear={() => { setCustomPrompt(''); notifyChange({ customPrompt: '' }); }}
+        />
       )}
 
       {/* ── ERROR ────────────────────────────────────────────── */}
