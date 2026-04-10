@@ -360,7 +360,7 @@ const template = newShotTemplate(maxShotNumber);
     } finally {
       setPreviewLoading(false);
     }
-  }, [project]);
+  }, [project, shotFrames]);
 
   // ── Drag & Drop reorder ─────────────────────────────────────
   const handleDragStart = (index) => setDragIdx(index);
