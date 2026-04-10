@@ -2,13 +2,9 @@
 // Vercel Serverless Function — proxy para Imagen 3 Inpainting via Vertex AI.
 // El frontend llama POST /api/imagen/inpaint
 //
-// Body esperado: { imageBase64, maskBase64 }
+// Body esperado: { imageBase64, maskBase64, projectId, accessToken }
 // Respuesta:     { base64 } — PNG resultado del inpainting
-//
-// Credenciales leídas del entorno del servidor (configurar en Vercel Dashboard):
-//   GOOGLE_CLOUD_PROJECT  — project ID de GCP (ej. "daru-studio-prod")
-//   VERTEX_ACCESS_TOKEN   — OAuth2 Bearer token (~1h)
-//                           Renovar con: gcloud auth print-access-token
+// Mismo patrón que /api/veo/generate — el frontend pasa projectId y accessToken.
 
 export const config = { maxDuration: 60 };
 
@@ -25,16 +21,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST')
     return res.status(405).json({ error: 'Method not allowed' });
 
-  const { imageBase64, maskBase64 } = req.body;
+  // Mismo patrón que /api/veo/generate — projectId y accessToken vienen del body
+  const { imageBase64, maskBase64, projectId, accessToken } = req.body;
 
-  const projectId   = process.env.GOOGLE_CLOUD_PROJECT;
-  const accessToken = process.env.VERTEX_ACCESS_TOKEN;
-
-  if (!imageBase64 || !maskBase64)
-    return res.status(400).json({ error: 'imageBase64 y maskBase64 son requeridos' });
-
-  if (!projectId || !accessToken)
-    return res.status(500).json({ error: 'Credenciales de Vertex AI no configuradas en el servidor (GOOGLE_CLOUD_PROJECT / VERTEX_ACCESS_TOKEN).' });
+  if (!imageBase64 || !maskBase64 || !projectId || !accessToken)
+    return res.status(400).json({ error: 'imageBase64, maskBase64, projectId y accessToken son requeridos' });
 
   const endpoint =
     `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}` +

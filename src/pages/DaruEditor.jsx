@@ -416,6 +416,18 @@ const syncElementsToFashionRefs = useCallback(() => {
   const handleInpaintRemoval = useCallback(async () => {
     if (!maskData || !currentMedia) return;
 
+    // Mismo patrón que VEO — leer del env y pasar en el body al servidor
+    const projectId   = process.env.REACT_APP_GOOGLE_CLOUD_PROJECT;
+    const accessToken = process.env.REACT_APP_VERTEX_ACCESS_TOKEN;
+
+    if (!projectId || !accessToken) {
+      setLastError(
+        'Token de Vertex AI no configurado. ' +
+        'Ve a Ajustes → API Keys y pega el output de: gcloud auth print-access-token'
+      );
+      return;
+    }
+
     setInpaintLoading(true);
     setLastError(null);
 
@@ -429,12 +441,12 @@ const syncElementsToFashionRefs = useCallback(() => {
         ? maskData.split(',')[1]
         : maskData;
 
-      // Las credenciales de Vertex AI están en el servidor — no en el frontend.
       const serverUrl = process.env.REACT_APP_SERVER_URL || '';
       const res = await fetch(`${serverUrl}/api/imagen/inpaint`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ imageBase64, maskBase64 }),
+        // projectId y accessToken en el body — igual que /api/veo/generate
+        body:    JSON.stringify({ imageBase64, maskBase64, projectId, accessToken }),
       });
 
       const data = await res.json().catch(() => ({}));

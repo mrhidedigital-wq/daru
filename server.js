@@ -17,26 +17,6 @@ const path       = require('path');
 const os         = require('os');
 const { execSync, exec } = require('child_process');
 const { createClient }   = require('@supabase/supabase-js');
-const { GoogleAuth }     = require('google-auth-library');
-
-// ── Google Auth — token automático para Vertex AI ─────────────
-// Usa Application Default Credentials (ADC):
-//   - Local dev: gcloud auth application-default login
-//   - GCP/Vercel: metadata server automático
-// Si ADC no está disponible, cae a VERTEX_ACCESS_TOKEN del .env.
-const _googleAuth = new GoogleAuth({
-  scopes: 'https://www.googleapis.com/auth/cloud-platform',
-});
-async function getVertexToken() {
-  try {
-    const client = await _googleAuth.getClient();
-    const { token } = await client.getAccessToken();
-    if (token) return token;
-  } catch (_) { /* ADC no disponible, usar fallback */ }
-  const staticToken = process.env.VERTEX_ACCESS_TOKEN;
-  if (!staticToken) throw new Error('No hay token de Vertex AI. Ejecuta: gcloud auth application-default login');
-  return staticToken;
-}
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -498,28 +478,14 @@ app.post('/api/veo/poll', async (req, res) => {
 
 // ── POST /api/imagen/inpaint ────────────────────────────────
 // Proxy para Imagen 3 Inpainting via Vertex AI.
-// Body: { imageBase64, maskBase64 }
-//
-// Auth: google-auth-library (ADC automático) con fallback a VERTEX_ACCESS_TOKEN.
-// Project: GOOGLE_CLOUD_PROJECT del entorno del servidor.
+// Body: { imageBase64, maskBase64, projectId, accessToken }
+// Mismo patrón que /api/veo/generate — el frontend pasa projectId y accessToken.
 // ─────────────────────────────────────────────────────────────
 app.post('/api/imagen/inpaint', async (req, res) => {
-  const { imageBase64, maskBase64 } = req.body;
+  const { imageBase64, maskBase64, projectId, accessToken } = req.body;
 
-  if (!imageBase64 || !maskBase64) {
-    return res.status(400).json({ error: 'imageBase64 y maskBase64 son requeridos' });
-  }
-
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-  if (!projectId) {
-    return res.status(500).json({ error: 'GOOGLE_CLOUD_PROJECT no configurado en el servidor.' });
-  }
-
-  let accessToken;
-  try {
-    accessToken = await getVertexToken();
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+  if (!imageBase64 || !maskBase64 || !projectId || !accessToken) {
+    return res.status(400).json({ error: 'imageBase64, maskBase64, projectId y accessToken son requeridos' });
   }
 
   const endpoint =
