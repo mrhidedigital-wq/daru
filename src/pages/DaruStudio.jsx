@@ -473,15 +473,17 @@ const template = newShotTemplate(maxShotNumber);
   console.log('END URL', frames.endUrl);
 
 
-    // Con prompt manual no es necesario hacer BUILD PROMPTS primero
     const hasCustomPrompt = !!(shotFrames[selectedShot.id]?.customPrompt?.trim());
-    if (!selectedShot.frame_start?.generatedPrompt && !hasCustomPrompt) {
-      setError('Escribe un prompt manual o haz click en BUILD PROMPTS primero.');
+    const hasStartUrl     = !!(shotFrames[selectedShot.id]?.startUrl);
+    const hasAction       = !!(shotFrames[selectedShot.id]?.action?.trim());
+
+    if (!hasCustomPrompt && !hasStartUrl) {
+      setError('Sube un frame inicial y describe la acción para generar el video.');
       return;
     }
 
     // ── Gate anti-alucinación: solo aplica en modo BUILD PROMPTS ──
-    // Con PROMPT MANUAL no hubo BUILD PROMPTS → no hay warnings que revisar.
+    // Con PROMPT MANUAL o auto-prompt no hay BUILD PROMPTS → no hay warnings que revisar.
     if (!hasCustomPrompt && warnings.length > 0 && !renderConfirmed) {
       setError(`⚠ Hay ${warnings.length} advertencia(s) de validación activas. Revísalas arriba. Haz click en GENERATE VIDEO de nuevo para continuar de todas formas.`);
       setRenderConfirmed(true); // Segundo click sí ejecuta
@@ -496,10 +498,10 @@ const template = newShotTemplate(maxShotNumber);
     try {
       await shotsDB.updateStatus(selectedShot.id, 'processing');
 
-      // Prompt manual: si existe, el DAGExecutor salta el PromptBuilderNode
-      // y va directo al VideoRenderNode con el prompt del usuario intacto.
+      // Prompt: customPrompt si existe; si no, acción como prompt automático.
       const customPrompt = (shotFrames[selectedShot.id] || {}).customPrompt || '';
-      const promptOverride = customPrompt.trim() || null;
+      const autoPrompt   = hasAction ? shotFrames[selectedShot.id].action.trim() : '';
+      const promptOverride = customPrompt.trim() || autoPrompt || null;
 
       // Leer modo del plano desde shotFrames (viene de FrameUploader via notifyChange)
       const currentFrames   = shotFrames[selectedShot.id] || {};
@@ -748,8 +750,8 @@ const template = newShotTemplate(maxShotNumber);
                   {previewLoading ? '⟳' : '🖼 PREVIEW'}
                 </button>
                 <button
-                  style={{ flex: 1, padding: '10px', background: renderingVideo ? '#333' : '#00A8E8', border: 'none', borderRadius: 4, color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', cursor: (renderingVideo || !shotFrames[selectedShot?.id]?.customPrompt?.trim()) ? 'not-allowed' : 'pointer', fontFamily: 'monospace', opacity: (renderingVideo || !shotFrames[selectedShot?.id]?.customPrompt?.trim()) ? 0.5 : 1 }}
-                  disabled={renderingVideo || !shotFrames[selectedShot?.id]?.customPrompt?.trim()}
+                  style={{ flex: 1, padding: '10px', background: renderingVideo ? '#333' : '#00A8E8', border: 'none', borderRadius: 4, color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', cursor: (renderingVideo || (!shotFrames[selectedShot?.id]?.startUrl && !shotFrames[selectedShot?.id]?.customPrompt?.trim())) ? 'not-allowed' : 'pointer', fontFamily: 'monospace', opacity: (renderingVideo || (!shotFrames[selectedShot?.id]?.startUrl && !shotFrames[selectedShot?.id]?.customPrompt?.trim())) ? 0.5 : 1 }}
+                  disabled={renderingVideo || (!shotFrames[selectedShot?.id]?.startUrl && !shotFrames[selectedShot?.id]?.customPrompt?.trim())}
                   onClick={handleGenerateVideo}
                 >
                   {renderingVideo ? '⟳ RENDERING...' : '▶ GENERATE VIDEO'}
