@@ -48,7 +48,6 @@ export default function FrameUploader({
   const [showDialogue,  setShowDialogue]  = useState(!!(shot?.dialogue));
   const [sameScene,     setScene]         = useState(false);
   const [subjectType,   setSubjectType]   = useState(null); // 'person' | 'animal' | 'object' | null
-  const [loadingAssets, setLoadingAssets] = useState(false);
 
   // ── Validar archivo ────────────────────────────────────────
   const validateFile = (file) => {
@@ -353,10 +352,7 @@ export default function FrameUploader({
       <div style={styles.sectionHeader}>
         <span style={styles.sectionLabel}>PERSONAJES</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {loadingAssets && (
-            <span style={{ fontSize: 8, color: C.accent, fontFamily: 'monospace' }}>⟳ cargando assets...</span>
-          )}
-          {characters.some(c => c.fromAsset) && (
+{characters.some(c => c.fromAsset) && (
             <span style={{ fontSize: 8, color: '#9B59B6', fontFamily: 'monospace', background: 'rgba(155,89,182,0.12)', padding: '1px 6px', borderRadius: 8 }}>
               🎨 ASSET MANAGER
             </span>
