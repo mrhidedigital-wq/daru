@@ -55,7 +55,7 @@ export default async function handler(req, res) {
   if (!apiKey)
     return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server' });
 
-  const modelId = model || 'gemini-2.5-flash-preview-04-17';
+  const modelId = model || 'gemini-2.5-flash-image';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
   try {
