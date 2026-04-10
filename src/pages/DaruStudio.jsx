@@ -691,8 +691,14 @@ const template = newShotTemplate(maxShotNumber);
               {/* ── IMAGE PREVIEW ──────────────────────────────────── */}
               {(previewImage || previewLoading) && (
                 <div style={{ marginTop: 4 }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: '#888', letterSpacing: '0.12em', fontFamily: 'monospace', marginBottom: 6 }}>
-                    IMAGE PREVIEW · ~$0.03
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#888', letterSpacing: '0.12em', fontFamily: 'monospace' }}>
+                      IMAGE PREVIEW · ~$0.03
+                    </span>
+                    <button
+                      onClick={() => setPreviewImage(null)}
+                      style={{ background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
+                    >✕</button>
                   </div>
                   {previewLoading ? (
                     <div style={{ height: 120, background: '#1A1A1A', border: '1px dashed #404040', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

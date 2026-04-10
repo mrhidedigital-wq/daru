@@ -5,7 +5,6 @@ import { characterAssetsDB }             from '../../lib/supabase/database';
 import { supabase }                      from '../../lib/supabase/client';
 import DropZone                          from './DropZone';
 import TurnaroundSlot                    from './TurnaroundSlot';
-import ManualPromptSection               from './ManualPromptSection';
 
 const C = {
   bg:      '#2A2A2A',
@@ -46,10 +45,10 @@ export default function FrameUploader({
   const [motionRef,     setMotionRef]     = useState(null);
   const [uploading,     setUploading]     = useState({});
   const [error,         setError]         = useState(null);
-  const [customPrompt,  setCustomPrompt]  = useState(shot?.customPrompt || '');
-  const [showPrompt,    setShowPrompt]    = useState(!!(shot?.customPrompt));
   const [dialogue,      setDialogue]      = useState(shot?.dialogue || '');
   const [showDialogue,  setShowDialogue]  = useState(!!(shot?.dialogue));
+  const [sameScene,     setScene]         = useState(false);
+  const [subjectType,   setSubjectType]   = useState(null); // 'person' | 'animal' | 'object' | null
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [subjectData,   setSubjectData]   = useState([]);  // subjects cargados de AssetManager
   const [sceneData,     setSceneData]     = useState([]);  // scenes cargadas de AssetManager
@@ -192,8 +191,9 @@ export default function FrameUploader({
       action,
       frameMode,
       characters,
-      customPrompt,
       dialogue,
+      sameScene,
+      subjectType,
       ...patch,
     });
   };
@@ -232,6 +232,63 @@ export default function FrameUploader({
           onClear={() => { setEndUrl(null); notifyChange({ endUrl: null }); }}
         />
       </div>
+
+      {/* ── MISMA ESCENA ─────────────────────────────────────── */}
+      {startUrl && endUrl && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={sameScene}
+              onChange={e => { setScene(e.target.checked); notifyChange({ sameScene: e.target.checked }); }}
+              style={{ accentColor: C.accent, cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: 10, fontFamily: 'monospace', color: C.text, letterSpacing: '0.04em' }}>
+              Misma escena — los dos frames son vistas distintas de la misma toma
+            </span>
+          </label>
+          {sameScene && (
+            <div style={{ fontSize: 9, color: C.accent, fontFamily: 'monospace', background: 'rgba(0,168,232,0.08)', border: `1px solid rgba(0,168,232,0.2)`, borderRadius: 4, padding: '5px 10px' }}>
+              El sistema usará ambas imágenes como referencia de la misma locación con diferente encuadre
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TIPO DE ELEMENTO PRINCIPAL ───────────────────────── */}
+      {(startUrl || endUrl) && (
+        <>
+          <div style={styles.sectionHeader}>
+            <span style={styles.sectionLabel}>TIPO DE ELEMENTO</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[
+              { key: 'person',  label: '👤 PERSONA', color: C.accent },
+              { key: 'animal',  label: '🐾 ANIMAL',  color: C.warning },
+              { key: 'object',  label: '📦 OBJETO',  color: C.success },
+            ].map(({ key, label, color }) => (
+              <button
+                key={key}
+                onClick={() => {
+                  const next = subjectType === key ? null : key;
+                  setSubjectType(next);
+                  notifyChange({ subjectType: next });
+                }}
+                style={{
+                  flex: 1, padding: '7px 0', borderRadius: 4, cursor: 'pointer',
+                  fontSize: 10, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.08em',
+                  background: subjectType === key ? color : '#1A1A1A',
+                  color: subjectType === key ? '#000' : C.muted,
+                  border: `1px solid ${subjectType === key ? color : C.border}`,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── MODO EXACTO / REFERENCIA ──────────────────────────── */}
       <div style={styles.sectionHeader}>
@@ -559,35 +616,6 @@ export default function FrameUploader({
             onChange={e => { const f = e.target.files?.[0]; if (f) uploadMotionRef(f); e.target.value = ''; }}
           />
         </>
-      )}
-
-      {/* ── PROMPT MANUAL (con IA integrada) ─────────────────── */}
-      <div style={styles.sectionHeader}>
-        <span style={styles.sectionLabel}>PROMPT MANUAL</span>
-        <button
-          onClick={() => setShowPrompt(p => !p)}
-          style={{
-            background: showPrompt ? 'rgba(255,184,0,0.15)' : 'transparent',
-            border: `1px solid ${showPrompt ? C.warning : C.border}`,
-            borderRadius: 4, color: showPrompt ? C.warning : C.muted,
-            padding: '2px 10px', fontSize: 9, fontWeight: 700,
-            letterSpacing: '0.08em', cursor: 'pointer', fontFamily: 'monospace',
-          }}
-        >
-          {showPrompt ? '● ACTIVO' : '○ OPCIONAL'}
-        </button>
-      </div>
-
-      {showPrompt && (
-        <ManualPromptSection
-          mediaProvider={mediaProvider}
-          subjectData={subjectData}
-          sceneData={sceneData}
-          projectId={projectId}
-          customPrompt={customPrompt}
-          onPromptChange={(text) => { setCustomPrompt(text); notifyChange({ customPrompt: text }); }}
-          onClear={() => { setCustomPrompt(''); notifyChange({ customPrompt: '' }); }}
-        />
       )}
 
       {/* ── ERROR ────────────────────────────────────────────── */}
