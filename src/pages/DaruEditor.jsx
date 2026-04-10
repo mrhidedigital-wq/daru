@@ -12,9 +12,10 @@ import {
   editElementsDB,
   editorStorage,
 } from '../lib/editor/editorDatabase';
-import EditorTopBar      from '../components/editor/EditorTopBar';
-import ElementsPanel     from '../components/editor/ElementsPanel';
-import FashionAssistPanel from '../components/editor/FashionAssistPanel';
+import EditorTopBar        from '../components/editor/EditorTopBar';
+import ElementsPanel       from '../components/editor/ElementsPanel';
+import FashionAssistPanel  from '../components/editor/FashionAssistPanel';
+import CinematicImagePanel from '../components/editor/CinematicImagePanel';
 
 // ─── Paleta (consistente con DaruStudio) ────────────────────
 const C = {
@@ -1020,6 +1021,10 @@ Responde SOLO con el prompt mejorado. Sin explicaciones, sin markdown.` });
             onUpdateConstraint={updateFashionConstraint}
             onDress={handleFashionDress}
           />
+
+          {/* ── 🎬 GENERADOR CINEMATOGRÁFICO ── */}
+          <div style={{ borderTop: `1px solid ${C.border}`, margin: '18px 0 0' }} />
+          <CinematicImagePanel />
 
           {/* ── DAG Pipeline Info ── */}
           {nodeUpdates.length > 0 && (
