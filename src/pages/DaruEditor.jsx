@@ -486,6 +486,21 @@ const syncElementsToFashionRefs = useCallback(() => {
     }
   }, [maskData, currentMedia, session, operations]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Descarga la imagen actual como PNG ──────────────────────
+  const handleDownload = useCallback(() => {
+    if (!currentMedia) return;
+    const img = mediaImgRef.current;
+    if (!img) return;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width  = img.naturalWidth  || img.width;
+    tempCanvas.height = img.naturalHeight || img.height;
+    tempCanvas.getContext('2d').drawImage(img, 0, 0);
+    const link = document.createElement('a');
+    link.download = `daru-export-${Date.now()}.png`;
+    link.href = tempCanvas.toDataURL('image/png');
+    link.click();
+  }, [currentMedia]);
+
   // ── Delete/Backspace borra la selección activa (máscara) ────
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -716,7 +731,7 @@ Responde SOLO con el prompt mejorado. Sin explicaciones, sin markdown.` });
     />
 
       {/* ── TOP BAR ── */}
-      <EditorTopBar session={session} originalMedia={originalMedia} operations={operations} />
+      <EditorTopBar session={session} originalMedia={originalMedia} operations={operations} onDownload={handleDownload} />
 
       {/* ── MAIN LAYOUT ── */}
       <div style={S.main}>

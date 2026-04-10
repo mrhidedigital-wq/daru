@@ -11,7 +11,7 @@ const C = {
   muted:   '#888892',
 };
 
-export default function EditorTopBar({ session, originalMedia, operations }) {
+export default function EditorTopBar({ session, originalMedia, operations, onDownload }) {
   const totalCost = operations.reduce((sum, op) => sum + (op.cost_usd || 0), 0);
 
   return (
@@ -34,6 +34,11 @@ export default function EditorTopBar({ session, originalMedia, operations }) {
           <span style={S.costBadge}>💰 ${totalCost.toFixed(4)}</span>
         )}
         <span style={S.versionBadge}>v{operations.length}</span>
+        {onDownload && (
+          <button onClick={onDownload} style={S.downloadBtn} title="Descargar imagen">
+            ↓
+          </button>
+        )}
       </div>
     </div>
   );
@@ -55,4 +60,5 @@ const S = {
   badge:        { fontSize: 9, background: C.card, padding: '2px 8px', borderRadius: 3, color: C.muted, letterSpacing: '0.1em' },
   costBadge:    { fontSize: 10, color: C.warning, background: 'rgba(255,184,0,0.1)', padding: '2px 8px', borderRadius: 3 },
   versionBadge: { fontSize: 9, background: C.accent, color: '#000', padding: '2px 6px', borderRadius: 3, fontWeight: 600 },
+  downloadBtn:  { background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, color: C.muted, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, fontWeight: 700, flexShrink: 0 },
 };
