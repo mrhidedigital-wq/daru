@@ -476,6 +476,89 @@ app.post('/api/veo/poll', async (req, res) => {
   }
 });
 
+// ── POST /api/imagen/inpaint ────────────────────────────────
+// Proxy para Imagen 3 Inpainting via Vertex AI.
+// Body: { imageBase64, maskBase64, projectId, accessToken }
+//
+// NOTA: accessToken es un OAuth2 Bearer token de corta duración (~1h).
+// El proyecto sigue el mismo patrón que /api/veo/generate — el frontend
+// lee REACT_APP_VERTEX_ACCESS_TOKEN y lo pasa al servidor.
+// Para tokens de larga duración en producción: configurar un Service Account
+// en GCP y generar tokens via google-auth-library en el servidor, evitando
+// exponer REACT_APP_VERTEX_ACCESS_TOKEN en el bundle del cliente.
+// ─────────────────────────────────────────────────────────────
+app.post('/api/imagen/inpaint', async (req, res) => {
+  const { imageBase64, maskBase64, projectId, accessToken } = req.body;
+
+  if (!imageBase64 || !maskBase64 || !projectId || !accessToken) {
+    return res.status(400).json({ error: 'imageBase64, maskBase64, projectId y accessToken son requeridos' });
+  }
+
+  const endpoint =
+    `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}` +
+    `/locations/us-central1/publishers/google/models/imagen-3.0-capability-001:predict`;
+
+  const body = {
+    instances: [{
+      prompt: '',
+      referenceImages: [
+        {
+          referenceType: 'REFERENCE_TYPE_RAW',
+          referenceId: 1,
+          referenceImage: { bytesBase64Encoded: imageBase64 },
+        },
+        {
+          referenceType: 'REFERENCE_TYPE_MASK',
+          referenceId: 2,
+          referenceImage: { bytesBase64Encoded: maskBase64 },
+          maskImageConfig: {
+            maskMode: 'MASK_MODE_USER_PROVIDED',
+            dilation: 0.01,
+          },
+        },
+      ],
+    }],
+    parameters: {
+      editMode:    'EDIT_MODE_INPAINT_REMOVAL',
+      editConfig:  { baseSteps: 12 },
+      sampleCount: 1,
+    },
+  };
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const msg = data?.error?.message || response.statusText;
+      console.error('[imagen/inpaint] Vertex error:', msg);
+      return res.status(response.status).json({
+        error: msg,
+        hint: response.status === 401 ? 'Access token expired. Run: gcloud auth print-access-token' : undefined,
+      });
+    }
+
+    const base64 = data.predictions?.[0]?.bytesBase64Encoded;
+    if (!base64) {
+      return res.status(500).json({ error: 'Imagen 3 no devolvió imagen en la respuesta' });
+    }
+
+    res.json({ base64 });
+
+  } catch (err) {
+    console.error('[imagen/inpaint]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /api/llm/complete ──────────────────────────────────
 // Proxy seguro para LLM providers — las claves NUNCA llegan al browser.
 // Body: { provider, model?, system?, prompt, temperature?, max_tokens? }
