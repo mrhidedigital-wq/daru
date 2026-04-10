@@ -98,11 +98,11 @@ export class AnalysisNode extends EditorNode {
   // ============================================================
 
   async _analyzeWithVision(imageBase64, context = {}) {
-    // Usar Gemini 2.5 Flash para análisis visual (multimodal)
-    const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-    const endpoint = `${serverUrl}/api/gemini/proxy/gemini-2.5-flash`;
+    // Usar Gemini 2.0 Flash para análisis visual (multimodal)
+    const endpoint = '/api/gemini/proxy';
 
     const body = {
+      model: 'gemini-2.0-flash',
       contents: [{
         parts: [
           {
