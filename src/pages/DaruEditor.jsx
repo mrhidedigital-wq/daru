@@ -292,7 +292,7 @@ const syncElementsToFashionRefs = useCallback(() => {
     } finally {
       setIsProcessing(false);
     }
-  }, [instruction, currentMedia, session, isProcessing, operations, elements, maskData, originalMedia, user, editMode]);
+  }, [instruction, currentMedia, session, isProcessing, operations, elements, maskData, originalMedia, user, editMode, aspectRatio]);
 
   // ════════════════════════════════════════════════════════════
   // ROLLBACK
