@@ -59,23 +59,13 @@
 
 import { urlToInlineData } from './assetUtils';
 
-// ─── Endpoints Gemini ─────────────────────────────────────────────────────────
-// ⚠️ MODELOS ACTUALIZADOS — marzo 2026:
-//   gemini-3-flash-preview     → DEPRECADO el 9 marzo 2026, devuelve 404.
-//                                Migrado a gemini-3.1-flash-lite-preview
-//   gemini-2.5-flash-image     → sigue activo (Nano Banana 1), OK para generación de frames
-//   gemini-3.1-flash-image-preview → nueva opción más rápida (Nano Banana 2), disponible desde feb 2026
-const GEMINI_TEXT_MODEL  = 'gemini-3.1-flash-lite-preview';
+// ─── Modelos Gemini ───────────────────────────────────────────────────────────
+// El modelo se pasa en el body; el proxy en /api/gemini/proxy lo lee de req.body.model
+const GEMINI_TEXT_MODEL  = 'gemini-2.0-flash';
 const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
 
-function geminiTextEndpoint() {
-  const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-  return `${serverUrl}/api/gemini/proxy/${GEMINI_TEXT_MODEL}`;
-}
-function geminiImageEndpoint() {
-  const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-  return `${serverUrl}/api/gemini/proxy/${GEMINI_IMAGE_MODEL}`;
-}
+function geminiTextEndpoint()  { return '/api/gemini/proxy'; }
+function geminiImageEndpoint() { return '/api/gemini/proxy'; }
 
 // ─── System prompt del PASO 1 — Grounding ────────────────────────────────────
 const GROUNDING_SYSTEM = `You are a visual reference analyst for a cinematic AI frame generation system.
@@ -347,6 +337,7 @@ Be exhaustive — especially on clothing colors and background elements.`,
     ];
 
     const body = {
+      model: GEMINI_TEXT_MODEL,
       contents: [{ role: 'user', parts }],
       systemInstruction: { parts: [{ text: GROUNDING_SYSTEM }] },
       generationConfig: {
@@ -503,6 +494,7 @@ Be exhaustive — especially on clothing colors and background elements.`,
     ];
 
     const body = {
+      model: GEMINI_IMAGE_MODEL,
       contents: [{ role: 'user', parts }],
       generationConfig: {
         responseModalities: ['IMAGE', 'TEXT'],
@@ -547,6 +539,7 @@ Be exhaustive — especially on clothing colors and background elements.`,
     ];
 
     const body = {
+      model: GEMINI_TEXT_MODEL,
       contents: [{ role: 'user', parts }],
       systemInstruction: { parts: [{ text: VALIDATION_SYSTEM }] },
       generationConfig: {

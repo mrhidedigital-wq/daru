@@ -738,8 +738,7 @@ export async function generateSceneViewWithRef(scene, angleKey, frontalUrl = nul
 // Llama a Gemini TEXT con la frontal como inline data.
 // Devuelve array de assets con posición espacial.
 export async function analyzeSceneFrontal(frontalImageUrl) {
-  const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-  const endpoint = `${serverUrl}/api/gemini/proxy/gemini-2.5-flash`;
+  const endpoint = '/api/gemini/proxy';
 
   const inline = await urlToInlineData(frontalImageUrl);
   if (!inline) return [];
@@ -759,6 +758,7 @@ Return ONLY a valid JSON array. No explanation, no markdown fences, no extra tex
 Example: [{"name":"kitchen island","material":"dark concrete top","position_lr":"center","position_depth":"midground","notes":"2 stools on left side"}]`;
 
   const body = {
+    model: 'gemini-2.0-flash',
     contents: [{
       role: 'user',
       parts: [

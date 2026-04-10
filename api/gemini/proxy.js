@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST')
     return res.status(405).json({ error: 'Method not allowed' });
 
-  const { contents, generationConfig, model } = req.body || {};
+  const { contents, generationConfig, systemInstruction, model } = req.body || {};
 
   if (!contents || !generationConfig)
     return res.status(400).json({ error: 'contents and generationConfig are required' });
@@ -62,7 +62,7 @@ export default async function handler(req, res) {
     const upstream = await fetch(url, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ contents, generationConfig }),
+      body:    JSON.stringify({ contents, generationConfig, ...(systemInstruction ? { systemInstruction } : {}) }),
     });
 
     const data = await upstream.json().catch(() => ({}));
