@@ -69,6 +69,9 @@ export default function DaruEditor() {
   // ── Fashion Assist ──
   const [isEnhancing, setIsEnhancing]           = useState(false);
 
+  // ── Inpaint Removal ──
+  const [inpaintLoading, setInpaintLoading]     = useState(false);
+
   // ── Refs ──
   const maskCanvasRef  = useRef(null);
   const maskCtxRef     = useRef(null);
@@ -409,6 +412,74 @@ const syncElementsToFashionRefs = useCallback(() => {
     setMaskData(null);
   };
 
+  // ── Inpaint Removal — elimina el área seleccionada con Imagen 3 ──
+  const handleInpaintRemoval = useCallback(async () => {
+    if (!maskData || !currentMedia) return;
+
+    const projectId   = process.env.REACT_APP_GOOGLE_CLOUD_PROJECT;
+    const accessToken = process.env.REACT_APP_VERTEX_ACCESS_TOKEN;
+
+    if (!projectId || !accessToken) {
+      setLastError('Faltan credenciales de Vertex AI (REACT_APP_GOOGLE_CLOUD_PROJECT / REACT_APP_VERTEX_ACCESS_TOKEN).');
+      return;
+    }
+
+    setInpaintLoading(true);
+    setLastError(null);
+
+    try {
+      // Imagen actual → base64
+      const imgResult  = await _imageToBase64(currentMedia);
+      const imageBase64 = imgResult.data;
+
+      // Máscara ya exportada en maskData (data:image/png;base64,...)
+      const maskBase64 = maskData.startsWith('data:')
+        ? maskData.split(',')[1]
+        : maskData;
+
+      const serverUrl = process.env.REACT_APP_SERVER_URL || '';
+      const res = await fetch(`${serverUrl}/api/imagen/inpaint`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ imageBase64, maskBase64, projectId, accessToken }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || `Error ${res.status}`);
+      }
+
+      const resultUrl = `data:image/png;base64,${data.base64}`;
+
+      // Persistir como nueva versión
+      if (session) {
+        const versionNumber = operations.length + 1;
+        const operation = await editOperationsDB.create(session.id, {
+          version_number: versionNumber,
+          instruction:    'Inpaint Removal',
+          operation_type: 'inpaint_removal',
+          original_url:   currentMedia,
+          status:         'completed',
+          result_url:     resultUrl,
+          cost_usd:       0.04,
+          provider:       'imagen_inpaint',
+        });
+        await editSessionsDB.updateCurrentVersion(session.id, resultUrl, versionNumber);
+        setOperations(prev => [...prev, {
+          ...operation, result_url: resultUrl, status: 'completed', cost_usd: 0.04, provider: 'imagen_inpaint',
+        }]);
+      }
+
+      setCurrentMedia(resultUrl);
+      clearMask();
+    } catch (err) {
+      setLastError(`Inpaint Removal: ${err.message}`);
+    } finally {
+      setInpaintLoading(false);
+    }
+  }, [maskData, currentMedia, session, operations]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Delete/Backspace borra la selección activa (máscara) ────
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -662,6 +733,8 @@ Responde SOLO con el prompt mejorado. Sin explicaciones, sin markdown.` });
           onSetMaskMode={setMaskMode}
           onSetBrushSize={setBrushSize}
           onClearMask={clearMask}
+          onInpaintRemoval={handleInpaintRemoval}
+          inpaintLoading={inpaintLoading}
           onToggleHistory={() => setShowHistory(!showHistory)}
           onRollback={handleRollback}
         />
@@ -724,6 +797,13 @@ Responde SOLO con el prompt mejorado. Sin explicaciones, sin markdown.` });
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
         />
+      )}
+      {inpaintLoading && (
+        <div style={S.inpaintOverlay}>
+          <span style={{ color: '#fff', fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.08em' }}>
+            ⟳ Eliminando con Imagen 3…
+          </span>
+        </div>
       )}
     </div>
   </div>
@@ -1079,6 +1159,12 @@ const S = {
   maskCanvas: {
     position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
     cursor: 'crosshair', borderRadius: 4,
+  },
+  inpaintOverlay: {
+    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+    background: 'rgba(0,0,0,0.65)', borderRadius: 4,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 10,
   },
 
   // ── Progress ──

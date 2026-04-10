@@ -37,8 +37,9 @@ const C = {
 export default function ElementsPanel({
   elements, operations, currentMedia, originalMedia,
   session, maskMode, maskData, brushSize, showHistory, isProcessing,
+  inpaintLoading,
   onOpenMedia, onAddElement, onRemoveElement,
-  onSetMaskMode, onSetBrushSize, onClearMask,
+  onSetMaskMode, onSetBrushSize, onClearMask, onInpaintRemoval,
   onToggleHistory, onRollback,
 }) {
   const elementInputRef = useRef(null);
@@ -112,11 +113,23 @@ export default function ElementsPanel({
           )}
 
           {maskData && (
-            <div style={S.toolRow}>
-              <button style={S.clearMaskBtn} onClick={onClearMask} title="Eliminar selección (Delete / Backspace)">
-                🗑 DELETE SELECTION
-              </button>
-              <span style={{ fontSize: 9, color: C.success }}>✓ Mask ready</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={S.toolRow}>
+                <button
+                  style={{ ...S.toolBtn, ...S.eliminarBtn, ...(inpaintLoading ? S.toolDisabled : {}) }}
+                  onClick={onInpaintRemoval}
+                  disabled={inpaintLoading}
+                  title="Eliminar objeto seleccionado con Imagen 3 (inpainting)"
+                >
+                  {inpaintLoading ? '⟳ ELIMINANDO…' : '🗑 ELIMINAR'}
+                </button>
+              </div>
+              <div style={S.toolRow}>
+                <button style={S.clearMaskBtn} onClick={onClearMask} title="Limpiar selección (Delete / Backspace)">
+                  ✕ LIMPIAR MÁSCARA
+                </button>
+                <span style={{ fontSize: 9, color: C.success }}>✓ Mask ready</span>
+              </div>
             </div>
           )}
         </>
@@ -195,7 +208,9 @@ const S = {
     flex: 1, padding: '6px 0', background: C.card, border: `1px solid ${C.border}`,
     borderRadius: 4, color: C.muted, cursor: 'pointer', fontSize: 10, textAlign: 'center',
   },
-  toolActive:   { border: `1px solid ${C.accent}`, color: C.accent, background: 'rgba(0,168,232,0.08)' },
+  toolActive:    { border: `1px solid ${C.accent}`, color: C.accent, background: 'rgba(0,168,232,0.08)' },
+  eliminarBtn:   { border: `1px solid ${C.error}`, color: C.error, background: 'rgba(255,71,87,0.08)' },
+  toolDisabled:  { opacity: 0.5, cursor: 'not-allowed' },
   brushRow:     { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 },
   clearMaskBtn: {
     flex: 1, padding: '4px 0', background: 'rgba(255,71,87,0.1)', border: `1px solid ${C.error}`,
