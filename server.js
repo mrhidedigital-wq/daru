@@ -478,20 +478,26 @@ app.post('/api/veo/poll', async (req, res) => {
 
 // ── POST /api/imagen/inpaint ────────────────────────────────
 // Proxy para Imagen 3 Inpainting via Vertex AI.
-// Body: { imageBase64, maskBase64, projectId, accessToken }
+// Body: { imageBase64, maskBase64 }
 //
-// NOTA: accessToken es un OAuth2 Bearer token de corta duración (~1h).
-// El proyecto sigue el mismo patrón que /api/veo/generate — el frontend
-// lee REACT_APP_VERTEX_ACCESS_TOKEN y lo pasa al servidor.
-// Para tokens de larga duración en producción: configurar un Service Account
-// en GCP y generar tokens via google-auth-library en el servidor, evitando
-// exponer REACT_APP_VERTEX_ACCESS_TOKEN en el bundle del cliente.
+// Las credenciales se leen del entorno del SERVIDOR (no del cliente):
+//   GOOGLE_CLOUD_PROJECT  — project ID de GCP
+//   VERTEX_ACCESS_TOKEN   — OAuth2 Bearer token (~1h)
+//                           Renovar con: gcloud auth print-access-token
+//
+// Patrón idéntico al de GEMINI_API_KEY: nunca llega al bundle del browser.
 // ─────────────────────────────────────────────────────────────
 app.post('/api/imagen/inpaint', async (req, res) => {
-  const { imageBase64, maskBase64, projectId, accessToken } = req.body;
+  const { imageBase64, maskBase64 } = req.body;
 
-  if (!imageBase64 || !maskBase64 || !projectId || !accessToken) {
-    return res.status(400).json({ error: 'imageBase64, maskBase64, projectId y accessToken son requeridos' });
+  const projectId   = process.env.GOOGLE_CLOUD_PROJECT;
+  const accessToken = process.env.VERTEX_ACCESS_TOKEN;
+
+  if (!imageBase64 || !maskBase64) {
+    return res.status(400).json({ error: 'imageBase64 y maskBase64 son requeridos' });
+  }
+  if (!projectId || !accessToken) {
+    return res.status(500).json({ error: 'Credenciales de Vertex AI no configuradas en el servidor (GOOGLE_CLOUD_PROJECT / VERTEX_ACCESS_TOKEN).' });
   }
 
   const endpoint =

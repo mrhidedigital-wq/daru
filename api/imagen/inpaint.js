@@ -2,8 +2,13 @@
 // Vercel Serverless Function — proxy para Imagen 3 Inpainting via Vertex AI.
 // El frontend llama POST /api/imagen/inpaint
 //
-// Body esperado: { imageBase64, maskBase64, projectId, accessToken }
+// Body esperado: { imageBase64, maskBase64 }
 // Respuesta:     { base64 } — PNG resultado del inpainting
+//
+// Credenciales leídas del entorno del servidor (configurar en Vercel Dashboard):
+//   GOOGLE_CLOUD_PROJECT  — project ID de GCP (ej. "daru-studio-prod")
+//   VERTEX_ACCESS_TOKEN   — OAuth2 Bearer token (~1h)
+//                           Renovar con: gcloud auth print-access-token
 
 export const config = { maxDuration: 60 };
 
@@ -20,10 +25,16 @@ export default async function handler(req, res) {
   if (req.method !== 'POST')
     return res.status(405).json({ error: 'Method not allowed' });
 
-  const { imageBase64, maskBase64, projectId, accessToken } = req.body;
+  const { imageBase64, maskBase64 } = req.body;
 
-  if (!imageBase64 || !maskBase64 || !projectId || !accessToken)
-    return res.status(400).json({ error: 'imageBase64, maskBase64, projectId y accessToken son requeridos' });
+  const projectId   = process.env.GOOGLE_CLOUD_PROJECT;
+  const accessToken = process.env.VERTEX_ACCESS_TOKEN;
+
+  if (!imageBase64 || !maskBase64)
+    return res.status(400).json({ error: 'imageBase64 y maskBase64 son requeridos' });
+
+  if (!projectId || !accessToken)
+    return res.status(500).json({ error: 'Credenciales de Vertex AI no configuradas en el servidor (GOOGLE_CLOUD_PROJECT / VERTEX_ACCESS_TOKEN).' });
 
   const endpoint =
     `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}` +
@@ -71,7 +82,10 @@ export default async function handler(req, res) {
     if (!upstream.ok) {
       const msg = data?.error?.message || upstream.statusText;
       console.error('[imagen/inpaint] Vertex error:', msg);
-      return res.status(upstream.status).json({ error: msg });
+      return res.status(upstream.status).json({
+        error: msg,
+        hint: upstream.status === 401 ? 'Token expirado. Actualizar VERTEX_ACCESS_TOKEN con: gcloud auth print-access-token' : undefined,
+      });
     }
 
     const base64 = data.predictions?.[0]?.bytesBase64Encoded;

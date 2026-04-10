@@ -416,20 +416,12 @@ const syncElementsToFashionRefs = useCallback(() => {
   const handleInpaintRemoval = useCallback(async () => {
     if (!maskData || !currentMedia) return;
 
-    const projectId   = process.env.REACT_APP_GOOGLE_CLOUD_PROJECT;
-    const accessToken = process.env.REACT_APP_VERTEX_ACCESS_TOKEN;
-
-    if (!projectId || !accessToken) {
-      setLastError('Faltan credenciales de Vertex AI (REACT_APP_GOOGLE_CLOUD_PROJECT / REACT_APP_VERTEX_ACCESS_TOKEN).');
-      return;
-    }
-
     setInpaintLoading(true);
     setLastError(null);
 
     try {
       // Imagen actual → base64
-      const imgResult  = await _imageToBase64(currentMedia);
+      const imgResult   = await _imageToBase64(currentMedia);
       const imageBase64 = imgResult.data;
 
       // Máscara ya exportada en maskData (data:image/png;base64,...)
@@ -437,11 +429,12 @@ const syncElementsToFashionRefs = useCallback(() => {
         ? maskData.split(',')[1]
         : maskData;
 
+      // Las credenciales de Vertex AI están en el servidor — no en el frontend.
       const serverUrl = process.env.REACT_APP_SERVER_URL || '';
       const res = await fetch(`${serverUrl}/api/imagen/inpaint`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ imageBase64, maskBase64, projectId, accessToken }),
+        body:    JSON.stringify({ imageBase64, maskBase64 }),
       });
 
       const data = await res.json().catch(() => ({}));
