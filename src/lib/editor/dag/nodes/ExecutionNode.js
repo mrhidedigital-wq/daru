@@ -33,7 +33,7 @@ export class ExecutionNode extends EditorNode {
   }
 
   async process(context = {}) {
-    const { mediaUrl, elements } = context;
+    const { mediaUrl, elements, aspectRatio } = context;
 
     // Obtener el paquete del PromptComposer
     const composerResult = this.getInputResult(EDITOR_NODE_TYPES.PROMPT_COMPOSER);
@@ -46,7 +46,7 @@ export class ExecutionNode extends EditorNode {
     // Ejecutar según provider
     switch (provider) {
       case 'gemini_edit':
-        return this._executeGeminiEdit(prompt, mediaUrl, elements, mask, editMode);
+        return this._executeGeminiEdit(prompt, mediaUrl, elements, mask, editMode, aspectRatio);
 
       case 'imagen_inpaint':
         return this._executeImagenInpaint(prompt, mediaUrl, mask);
@@ -64,7 +64,7 @@ export class ExecutionNode extends EditorNode {
   // El más versátil: acepta imagen + texto + imágenes de referencia
   // ============================================================
 
-  async _executeGeminiEdit(prompt, mediaUrl, elements = [], mask, editMode = 'faithful') {
+  async _executeGeminiEdit(prompt, mediaUrl, elements = [], mask, editMode = 'faithful', aspectRatio = '16:9') {
     const endpoint = '/api/gemini/proxy';
 
     // Construir partes del mensaje
@@ -129,6 +129,7 @@ export class ExecutionNode extends EditorNode {
       contents: [{ parts }],
       generationConfig: {
         responseModalities: ['IMAGE', 'TEXT'],
+        imageConfig: { aspectRatio },
         temperature: 0.4,
       },
     };

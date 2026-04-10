@@ -64,6 +64,7 @@ export default function DaruEditor() {
   const [showHistory, setShowHistory] = useState(false);
   const [compareMode, setCompareMode] = useState('side'); // 'side'|'overlay'
   const [editMode,    setEditMode]    = useState('faithful'); // 'faithful'|'creative'
+  const [aspectRatio, setAspectRatio] = useState('16:9');
 
   // ── Fashion Assist ──
   const [isEnhancing, setIsEnhancing]           = useState(false);
@@ -242,6 +243,7 @@ const syncElementsToFashionRefs = useCallback(() => {
         mediaType:   originalMedia?.type || 'image',
         instruction: instruction.trim(),
         editMode,
+        aspectRatio,
         elements:    elements.map(e => ({
           imageUrl: e.imageUrl, name: e.name, description: e.description,
         })),
@@ -511,6 +513,7 @@ const handleFashionDress = useCallback(async () => {
     setIsEnhancing(false);
   }
 }, [currentMedia, elements.length, session, user, isProcessing, operations.length, fashionAssistInput]);
+
 
   // ════════════════════════════════════════════════════════════
   // MEJORAR PROMPT — Para el textarea de INSTRUCTION general
@@ -783,6 +786,29 @@ Responde SOLO con el prompt mejorado. Sin explicaciones, sin markdown.` });
                 {elements.length} element{elements.length > 1 ? 's' : ''} loaded
               </span>
             )}
+          </div>
+
+          {/* ── FORMATO DE SALIDA ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <span style={{ fontSize: 9, color: C.muted, fontFamily: 'monospace', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
+              FORMATO
+            </span>
+            {['16:9', '9:16', '1:1', '4:3', '3:4'].map(ratio => (
+              <button
+                key={ratio}
+                onClick={() => setAspectRatio(ratio)}
+                style={{
+                  flex: 1, padding: '5px 0', borderRadius: 4, cursor: 'pointer',
+                  fontSize: 8, fontWeight: 700, fontFamily: 'monospace',
+                  background: aspectRatio === ratio ? C.accent : C.card,
+                  color:      aspectRatio === ratio ? '#000'   : C.muted,
+                  border:     `1px solid ${aspectRatio === ratio ? C.accent : C.border}`,
+                  transition: 'all 0.12s',
+                }}
+              >
+                {ratio}
+              </button>
+            ))}
           </div>
 
           {/* ── MEJORAR PROMPT CON IA ── */}

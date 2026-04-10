@@ -355,6 +355,7 @@ export async function executeEdit(params) {
       mediaType:      params.mediaType || 'image',
       instruction:    params.instruction,
       editMode:       params.editMode || 'faithful',
+      aspectRatio:    params.aspectRatio || '16:9',
       elements:       params.elements || [],
       userMask:       params.userMask || null,
       targetProvider: params.targetProvider || null,
