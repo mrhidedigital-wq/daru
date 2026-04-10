@@ -92,8 +92,6 @@ function downloadImage(dataUrl, filename) {
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════
 export default function CinematicImagePanel() {
-  const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-
   // ── Fase 1: generación ──
   const [userIdea,        setUserIdea]        = useState('');
   const [improvedPrompt,  setImprovedPrompt]  = useState('');
@@ -125,23 +123,14 @@ export default function CinematicImagePanel() {
     setGenError(null);
 
     try {
-      const res = await fetch(`${serverUrl}/api/gemini/proxy/gemini-2.5-flash`, {
+      const res = await fetch('/api/gemini/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `${IMPROVE_SYSTEM}\n\nUser description: ${userIdea}`,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 300,
-          },
+          model: 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: userIdea }] }],
+          systemInstruction: { parts: [{ text: IMPROVE_SYSTEM }] },
+          generationConfig: { temperature: 0.4, maxOutputTokens: 300 },
         }),
       });
 
@@ -160,7 +149,7 @@ export default function CinematicImagePanel() {
     } finally {
       setIsImproving(false);
     }
-  }, [userIdea, serverUrl]);
+  }, [userIdea]);
 
   // ════════════════════════════════════════════════════════════
   // GENERAR IMAGEN
@@ -184,19 +173,15 @@ export default function CinematicImagePanel() {
 
       const fullPrompt = `${prompt} ${arNote}`;
 
-      const res = await fetch(
-        `${serverUrl}/api/gemini/proxy/gemini-3.1-flash-image-preview`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: fullPrompt }] }],
-            generationConfig: {
-              responseModalities: ['IMAGE', 'TEXT'],
-            },
-          }),
-        }
-      );
+      const res = await fetch('/api/gemini/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash-image',
+          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+        }),
+      });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -225,7 +210,7 @@ export default function CinematicImagePanel() {
     } finally {
       setIsGenerating(false);
     }
-  }, [improvedPrompt, userIdea, aspectRatio, serverUrl]);
+  }, [improvedPrompt, userIdea, aspectRatio]);
 
   // ════════════════════════════════════════════════════════════
   // GENERAR FRAME FINAL (multi-turn conversation)
@@ -242,13 +227,12 @@ export default function CinematicImagePanel() {
       const originalPrompt = improvedPrompt.trim() || userIdea.trim();
       const editPrompt = `Take this exact scene and character, change ONLY the shot type to ${planoFinal} with ${anguloFinal}. Keep identical: lighting, character appearance, clothing, location, color palette. Same moment, different framing.`;
 
-      const res = await fetch(
-        `${serverUrl}/api/gemini/proxy/gemini-3.1-flash-image-preview`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
+      const res = await fetch('/api/gemini/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash-image',
+          contents: [
               // Turno 1 usuario: lo que generó el frame inicial
               {
                 role: 'user',
@@ -272,12 +256,9 @@ export default function CinematicImagePanel() {
                 parts: [{ text: editPrompt }],
               },
             ],
-            generationConfig: {
-              responseModalities: ['IMAGE', 'TEXT'],
-            },
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
           }),
-        }
-      );
+      });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -306,7 +287,7 @@ export default function CinematicImagePanel() {
     } finally {
       setIsGenFinal(false);
     }
-  }, [generatedImage, improvedPrompt, userIdea, planoFinal, anguloFinal, serverUrl]);
+  }, [generatedImage, improvedPrompt, userIdea, planoFinal, anguloFinal]);
 
   // ════════════════════════════════════════════════════════════
   // DESCARGAS
