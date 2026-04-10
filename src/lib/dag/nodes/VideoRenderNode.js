@@ -9,7 +9,7 @@ const _keyCache = new Map();
 const KEY_CACHE_TTL_MS  = 5  * 60 * 1000; // 5 min
 const TOKEN_MAX_AGE_MS  = 60 * 60 * 1000; // 60 min
 
-async function resolveKey(keyName, envFallback) {
+export async function resolveKey(keyName, envFallback) {
   const now    = Date.now();
   const cached = _keyCache.get(keyName);
   if (cached && (now - cached.ts) < KEY_CACHE_TTL_MS) return cached.value;
@@ -34,7 +34,7 @@ async function resolveKey(keyName, envFallback) {
   return envValue;
 }
 
-async function resolveVertexToken() {
+export async function resolveVertexToken() {
   const now = Date.now();
 
   try {

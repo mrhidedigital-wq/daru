@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_FASHION_ASSIST_INPUT } from '../lib/editor/fashionAssistSchema';
 
 import { executeEdit } from '../lib/editor/dag/EditorDAGExecutor';
+import { resolveKey, resolveVertexToken } from '../lib/dag/nodes/VideoRenderNode';
 import FashionAssistService from '../lib/editor/FashionAssistService';
 import {
   editSessionsDB,
@@ -416,9 +417,9 @@ const syncElementsToFashionRefs = useCallback(() => {
   const handleInpaintRemoval = useCallback(async () => {
     if (!maskData || !currentMedia) return;
 
-    // Mismo patrón que VEO — leer del env y pasar en el body al servidor
-    const projectId   = process.env.REACT_APP_GOOGLE_CLOUD_PROJECT;
-    const accessToken = process.env.REACT_APP_VERTEX_ACCESS_TOKEN;
+    // Mismo patrón que VEO — Supabase primero, fallback a .env
+    const projectId   = await resolveKey('google_cloud_project', 'REACT_APP_GOOGLE_CLOUD_PROJECT');
+    const accessToken = await resolveVertexToken();
 
     if (!projectId || !accessToken) {
       setLastError(
