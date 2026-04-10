@@ -339,9 +339,9 @@ const template = newShotTemplate(maxShotNumber);
   // ── Image Preview (ahorra ~$17.94/sesión) ───────────────────
   const handlePreviewImage = useCallback(async (shot) => {
     if (!shot) return;
-    const prompt = shot.frame_start?.generatedPrompt;
+    const prompt = shotFrames[shot.id]?.customPrompt?.trim();
     if (!prompt) {
-      setError('Genera los prompts primero (BUILD PROMPTS) antes del preview.');
+      setError('Escribe un prompt en PROMPT MANUAL antes del preview.');
       return;
     }
 
@@ -740,24 +740,16 @@ const template = newShotTemplate(maxShotNumber);
               {/* ── ACTION BUTTONS ───────────────────────────────── */}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
-                  style={{ flex: 1, padding: '10px', background: '#333', border: `1px solid ${shotFrames[selectedShot?.id]?.customPrompt?.trim() ? '#555' : '#404040'}`, borderRadius: 4, color: shotFrames[selectedShot?.id]?.customPrompt?.trim() ? '#555' : '#DDDDDD', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', cursor: generating ? 'not-allowed' : 'pointer', fontFamily: 'monospace', opacity: generating ? 0.5 : shotFrames[selectedShot?.id]?.customPrompt?.trim() ? 0.3 : 1 }}
-                  disabled={generating}
-                  onClick={() => handleGenerateShot(selectedShot)}
-                  title={shotFrames[selectedShot?.id]?.customPrompt?.trim() ? 'PROMPT MANUAL activo — BUILD PROMPTS no es necesario' : 'Generar prompts cinematográficos con IA'}
-                >
-                  {generating ? '⟳ BUILDING...' : '◈ BUILD PROMPTS'}
-                </button>
-                <button
-                  style={{ padding: '10px', background: '#333', border: '1px solid #FFB800', borderRadius: 4, color: '#FFB800', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', cursor: previewLoading || !selectedShot?.frame_start?.generatedPrompt ? 'not-allowed' : 'pointer', fontFamily: 'monospace', opacity: previewLoading || !selectedShot?.frame_start?.generatedPrompt ? 0.5 : 1 }}
-                  disabled={previewLoading || !selectedShot?.frame_start?.generatedPrompt}
+                  style={{ padding: '10px', background: '#333', border: '1px solid #FFB800', borderRadius: 4, color: '#FFB800', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', cursor: previewLoading || !shotFrames[selectedShot?.id]?.customPrompt?.trim() ? 'not-allowed' : 'pointer', fontFamily: 'monospace', opacity: previewLoading || !shotFrames[selectedShot?.id]?.customPrompt?.trim() ? 0.5 : 1 }}
+                  disabled={previewLoading || !shotFrames[selectedShot?.id]?.customPrompt?.trim()}
                   onClick={() => handlePreviewImage(selectedShot)}
                   title="Genera imagen preview (~$0.03) antes de gastar en video"
                 >
                   {previewLoading ? '⟳' : '🖼 PREVIEW'}
                 </button>
                 <button
-                  style={{ flex: 1, padding: '10px', background: renderingVideo ? '#333' : '#00A8E8', border: 'none', borderRadius: 4, color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', cursor: (renderingVideo || (!selectedShot?.frame_start?.generatedPrompt && !shotFrames[selectedShot?.id]?.customPrompt?.trim())) ? 'not-allowed' : 'pointer', fontFamily: 'monospace', opacity: (renderingVideo || (!selectedShot?.frame_start?.generatedPrompt && !shotFrames[selectedShot?.id]?.customPrompt?.trim())) ? 0.5 : 1 }}
-                  disabled={renderingVideo || (!selectedShot?.frame_start?.generatedPrompt && !shotFrames[selectedShot?.id]?.customPrompt?.trim())}
+                  style={{ flex: 1, padding: '10px', background: renderingVideo ? '#333' : '#00A8E8', border: 'none', borderRadius: 4, color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', cursor: (renderingVideo || !shotFrames[selectedShot?.id]?.customPrompt?.trim()) ? 'not-allowed' : 'pointer', fontFamily: 'monospace', opacity: (renderingVideo || !shotFrames[selectedShot?.id]?.customPrompt?.trim()) ? 0.5 : 1 }}
+                  disabled={renderingVideo || !shotFrames[selectedShot?.id]?.customPrompt?.trim()}
                   onClick={handleGenerateVideo}
                 >
                   {renderingVideo ? '⟳ RENDERING...' : '▶ GENERATE VIDEO'}
