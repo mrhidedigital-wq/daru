@@ -113,8 +113,8 @@ export default function ElementsPanel({
 
           {maskData && (
             <div style={S.toolRow}>
-              <button style={S.clearMaskBtn} onClick={onClearMask}>
-                🗑️ CLEAR MASK
+              <button style={S.clearMaskBtn} onClick={onClearMask} title="Eliminar selección (Delete / Backspace)">
+                🗑 DELETE SELECTION
               </button>
               <span style={{ fontSize: 9, color: C.success }}>✓ Mask ready</span>
             </div>

@@ -409,6 +409,18 @@ const syncElementsToFashionRefs = useCallback(() => {
     setMaskData(null);
   };
 
+  // ── Delete/Backspace borra la selección activa (máscara) ────
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (maskData) clearMask();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [maskData]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ════════════════════════════════════════════════════════════
   // FASHION ASSIST — Un botón: analiza y viste automáticamente
   // ════════════════════════════════════════════════════════════
