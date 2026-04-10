@@ -65,8 +65,7 @@ export class ExecutionNode extends EditorNode {
   // ============================================================
 
   async _executeGeminiEdit(prompt, mediaUrl, elements = [], mask, editMode = 'faithful') {
-    const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-    const endpoint = `${serverUrl}/api/gemini/proxy/gemini-2.5-flash-image`;
+    const endpoint = '/api/gemini/proxy';
 
     // Construir partes del mensaje
     const parts = [];
@@ -126,6 +125,7 @@ export class ExecutionNode extends EditorNode {
     });
 
     const body = {
+      model: 'gemini-2.5-flash-image',
       contents: [{ parts }],
       generationConfig: {
         responseModalities: ['IMAGE', 'TEXT'],
@@ -180,9 +180,9 @@ export class ExecutionNode extends EditorNode {
   // ============================================================
 
   async _executeImagenInpaint(prompt, mediaUrl, mask) {
-    const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-    // El endpoint de Imagen usa :predict en lugar de :generateContent
-    const endpoint = `${serverUrl}/api/gemini/proxy/imagen-3.0-capability-001/predict`;
+    // El endpoint de Imagen usa :predict — el proxy principal no lo soporta,
+    // si falla cae automáticamente al fallback _executeGeminiEdit (línea 227)
+    const endpoint = '/api/imagen/inpaint';
 
     const imageBase64 = await this.imageToBase64(mediaUrl);
 
