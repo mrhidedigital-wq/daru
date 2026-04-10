@@ -47,7 +47,7 @@ async function callGemini({ model, system, prompt, temperature, max_tokens }) {
   const apiKey = await getGeminiKey();
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
-  const modelId = model || 'gemini-2.0-flash';
+  const modelId = model || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
   const expectsJson =

@@ -102,7 +102,7 @@ export class AnalysisNode extends EditorNode {
     const endpoint = '/api/gemini/proxy';
 
     const body = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       contents: [{
         parts: [
           {

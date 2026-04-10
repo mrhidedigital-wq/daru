@@ -758,7 +758,7 @@ Return ONLY a valid JSON array. No explanation, no markdown fences, no extra tex
 Example: [{"name":"kitchen island","material":"dark concrete top","position_lr":"center","position_depth":"midground","notes":"2 stools on left side"}]`;
 
   const body = {
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: [{
       role: 'user',
       parts: [
