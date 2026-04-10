@@ -185,7 +185,7 @@ export default function CinematicImagePanel() {
       const fullPrompt = `${prompt} ${arNote}`;
 
       const res = await fetch(
-        `${serverUrl}/api/gemini/proxy/gemini-2.0-flash-preview-image-generation`,
+        `${serverUrl}/api/gemini/proxy/gemini-3.1-flash-image-preview`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -243,7 +243,7 @@ export default function CinematicImagePanel() {
       const editPrompt = `Take this exact scene and character, change ONLY the shot type to ${planoFinal} with ${anguloFinal}. Keep identical: lighting, character appearance, clothing, location, color palette. Same moment, different framing.`;
 
       const res = await fetch(
-        `${serverUrl}/api/gemini/proxy/gemini-2.0-flash-preview-image-generation`,
+        `${serverUrl}/api/gemini/proxy/gemini-3.1-flash-image-preview`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
