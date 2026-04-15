@@ -32,6 +32,53 @@ const C = {
   dim:     '#555555',
 };
 
+// ─── Provider formats ─────────────────────────────────────────
+const PROVIDER_FORMATS = {
+  veo: {
+    resolutions: ['720p', '1080p', '4k'],
+    aspectRatios: ['16:9', '9:16'],
+    defaultResolution: '1080p',
+    defaultAspectRatio: '16:9',
+    resolutionWarnings: {
+      '4k': 'Alta latencia y costo. Solo Veo 3.1 full.',
+    },
+  },
+  kling: {
+    resolutions: ['720p', '1080p', '4k'],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    defaultResolution: '1080p',
+    defaultAspectRatio: '16:9',
+    resolutionWarnings: {
+      '4k': 'Más créditos. Usar para output final, no drafts.',
+    },
+  },
+  seeddance: {
+    resolutions: ['480p', '720p', '1080p'],
+    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+    defaultResolution: '720p',
+    defaultAspectRatio: '16:9',
+    resolutionWarnings: {
+      '480p': 'Solo para preview/draft. Muy bajo costo.',
+    },
+  },
+};
+
+const RESOLUTION_LABELS = {
+  '480p':  '854×480',
+  '720p':  '1280×720',
+  '1080p': '1920×1080',
+  '4k':    '3840×2160',
+};
+
+const RATIO_PLATFORMS = {
+  '16:9':  'YouTube · Cinema · TV',
+  '9:16':  'TikTok · Reels · Shorts',
+  '1:1':   'Instagram · Feed',
+  '4:3':   'Clásico · Retro',
+  '21:9':  'Ultrawide · Cinemascope',
+  '3:4':   'Portrait · Pinterest',
+};
+
 // ─── Default new shot ─────────────────────────────────────────
 function newShotTemplate(index) {
   return {
@@ -88,6 +135,8 @@ export default function DaruStudio() {
   const [dragIdx,           setDragIdx]           = useState(null);       // drag & drop index
   const [exporting,         setExporting]         = useState(false);
   const [exportUrl,         setExportUrl]         = useState(null);
+  const [renderResolution,  setRenderResolution]  = useState('1080p');
+  const [renderAspectRatio, setRenderAspectRatio] = useState('16:9');
 
   // ── Abrir modal Quick Start ──────────────────────────────────
   const abrirModalPreset = (presetKey) => {
@@ -191,6 +240,14 @@ const template = newShotTemplate(maxShotNumber);
 
   // Cargar costos al montar y después de cada generación
   useEffect(() => { loadProjectCost(); }, [loadProjectCost]);
+
+  // Resetear resolution y aspectRatio al cambiar de proveedor
+  useEffect(() => {
+    const fmt = PROVIDER_FORMATS[mediaProvider];
+    if (!fmt) return;
+    setRenderResolution(fmt.defaultResolution);
+    setRenderAspectRatio(fmt.defaultAspectRatio);
+  }, [mediaProvider]);
 
   // ── DAG Generate ────────────────────────────────────────────
   const handleGenerateShot = useCallback(async (shot) => {
@@ -685,7 +742,7 @@ const template = newShotTemplate(maxShotNumber);
                     autoPlay
                     loop
                     src={videoUrl || selectedShot.result_video_url}
-                    style={{ width: '100%', borderRadius: 4, background: '#111', border: '1px solid #404040', maxHeight: 180 }}
+                    style={{ width: '100%', borderRadius: 4, background: '#111', border: '1px solid #404040', maxHeight: 180, aspectRatio: renderAspectRatio.replace(':', ' / '), objectFit: 'contain' }}
                   />
                 </div>
               )}
@@ -710,7 +767,7 @@ const template = newShotTemplate(maxShotNumber);
                     <img
                       src={previewImage}
                       alt="Preview"
-                      style={{ width: '100%', borderRadius: 4, border: '1px solid #404040', maxHeight: 200, objectFit: 'contain', background: '#111' }}
+                      style={{ width: '100%', borderRadius: 4, border: '1px solid #404040', maxHeight: 200, objectFit: 'contain', background: '#111', aspectRatio: renderAspectRatio.replace(':', ' / ') }}
                     />
                   )}
                 </div>
@@ -722,6 +779,84 @@ const template = newShotTemplate(maxShotNumber);
                   ↪ SCENE EXTENSION: el último frame del shot anterior se usará automáticamente como frame de inicio
                 </div>
               )}
+
+              {/* ── RESOLUTION SELECTOR ──────────────────────────── */}
+              {(() => {
+                const fmt = PROVIDER_FORMATS[mediaProvider];
+                const resWarn = fmt.resolutionWarnings?.[renderResolution];
+                const veoRatioWarn = mediaProvider === 'veo' && renderAspectRatio === '9:16' && (renderResolution === '1080p' || renderResolution === '4k');
+                const activeWarn = veoRatioWarn
+                  ? `9:16 solo soporta hasta 720p en Veo.`
+                  : resWarn || null;
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ fontSize: 8, color: C.muted, fontFamily: 'monospace', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Resolución</div>
+                    <select
+                      value={renderResolution}
+                      onChange={e => setRenderResolution(e.target.value)}
+                      style={{ background: '#2A2A2A', border: '1px solid #404040', borderRadius: 4, color: '#DDDDDD', padding: '6px 10px', fontSize: 10, fontFamily: 'monospace', outline: 'none' }}
+                    >
+                      {fmt.resolutions.map(r => (
+                        <option key={r} value={r}>{r} — {RESOLUTION_LABELS[r]}</option>
+                      ))}
+                    </select>
+                    {activeWarn && (
+                      <div style={{ fontSize: 8, color: C.warning, fontFamily: 'monospace', lineHeight: 1.4 }}>⚠ {activeWarn}</div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ── ASPECT RATIO SELECTOR ────────────────────────── */}
+              {(() => {
+                const fmt = PROVIDER_FORMATS[mediaProvider];
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ fontSize: 8, color: C.muted, fontFamily: 'monospace', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Aspect Ratio</div>
+                    <select
+                      value={renderAspectRatio}
+                      onChange={e => setRenderAspectRatio(e.target.value)}
+                      style={{ background: '#2A2A2A', border: '1px solid #404040', borderRadius: 4, color: '#DDDDDD', padding: '6px 10px', fontSize: 10, fontFamily: 'monospace', outline: 'none' }}
+                    >
+                      {fmt.aspectRatios.map(r => (
+                        <option key={r} value={r}>{r}{RATIO_PLATFORMS[r] ? ` — ${RATIO_PLATFORMS[r]}` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
+
+              {/* ── ASPECT RATIO PREVIEW BOX ─────────────────────── */}
+              {(() => {
+                const [w, h] = renderAspectRatio.split(':').map(Number);
+                const cssRatio = `${w} / ${h}`;
+                const resPx = RESOLUTION_LABELS[renderResolution] || '';
+                const platform = RATIO_PLATFORMS[renderAspectRatio] || '';
+                const isPortrait = h > w;
+                return (
+                  <div style={{ display: 'flex', justifyContent: isPortrait ? 'center' : 'stretch' }}>
+                    <div style={{
+                      width: isPortrait ? 60 : '100%',
+                      aspectRatio: cssRatio,
+                      background: '#1A1A1A',
+                      border: '1px solid #404040',
+                      borderRadius: 4,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 3,
+                      padding: '8px 4px',
+                    }}>
+                      <span style={{ fontSize: isPortrait ? 8 : 14, fontWeight: 700, color: C.accent, fontFamily: 'monospace', letterSpacing: '0.05em' }}>{renderAspectRatio}</span>
+                      <span style={{ fontSize: isPortrait ? 6 : 9, color: C.muted, fontFamily: 'monospace' }}>{resPx}</span>
+                      {platform && (
+                        <span style={{ fontSize: isPortrait ? 5 : 8, color: C.dim, fontFamily: 'monospace', textAlign: 'center', lineHeight: 1.3 }}>{platform}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* ── MEDIA PROVIDER SELECTOR + COSTO ─────────────── */}
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
