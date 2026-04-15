@@ -56,6 +56,10 @@ export default function FrameUploader({
   const [sameScene,     setScene]         = useState(false);
   const [subjectType,   setSubjectType]   = useState(null); // 'person' | 'animal' | 'object' | null
 
+  // Ref que siempre apunta al characters actual — evita leer closure stale en useEffect
+  const charactersRef = useRef(characters);
+  useEffect(() => { charactersRef.current = characters; });
+
   // ── Cargar sujetos y escenas de AssetManager al montar ──────
   useEffect(() => {
     if (!projectId) return;
@@ -81,12 +85,17 @@ export default function FrameUploader({
             },
           }));
           setSubjectData(subjects);
-          const existingHasImages = characters.some(c =>
+          // Fix: leer charactersRef.current (valor real) en lugar del closure stale
+          const existingHasImages = charactersRef.current.some(c =>
             Object.values(c.images || {}).some(Boolean)
           );
           if (!existingHasImages) {
             setCharacters(assetChars);
-            notifyChange({ characters: assetChars });
+            // Fix: llamar onFramesChange directamente con SOLO characters.
+            // Pasar por notifyChange() usaría su closure stale y mandaría
+            // startUrl/endUrl/turnaround con los valores iniciales nulos,
+            // borrando frames que el usuario ya tenía guardados en shotFrames.
+            onFramesChange?.({ characters: assetChars });
           }
         }
 
