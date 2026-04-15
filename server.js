@@ -727,7 +727,7 @@ const geminiProxyHandler = async (req, res) => {
     return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server' });
   }
 
-  const { model } = req.params;
+  const model = req.params.model || req.body.model || 'gemini-2.5-flash-image';
   const action = req.params.action || 'generateContent';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${action}?key=${apiKey}`;
 
@@ -745,6 +745,7 @@ const geminiProxyHandler = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+app.post('/api/gemini/proxy', geminiProxyHandler);       // modelo en el body
 app.post('/api/gemini/proxy/:model', geminiProxyHandler);
 app.post('/api/gemini/proxy/:model/:action', geminiProxyHandler);
 

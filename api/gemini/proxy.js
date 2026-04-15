@@ -46,23 +46,35 @@ export default async function handler(req, res) {
   if (req.method !== 'POST')
     return res.status(405).json({ error: 'Method not allowed' });
 
-  const { contents, generationConfig, systemInstruction, model } = req.body || {};
+  const { contents, generationConfig, systemInstruction, model, aspectRatio } = req.body || {};
 
-  if (!contents || !generationConfig)
-    return res.status(400).json({ error: 'contents and generationConfig are required' });
+  if (!contents)
+    return res.status(400).json({ error: 'contents is required' });
 
   const apiKey = await getGeminiKey();
   if (!apiKey)
     return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server' });
 
   const modelId = model || 'gemini-2.5-flash-image';
+
+  // Construir generationConfig: si viene del cliente se usa tal cual,
+  // si no se construye con imageConfig.aspectRatio para generación de imágenes.
+  const resolvedGenerationConfig = generationConfig || {
+    responseModalities: ['TEXT', 'IMAGE'],
+    imageConfig: { aspectRatio: aspectRatio || '16:9' },
+  };
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
   try {
     const upstream = await fetch(url, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ contents, generationConfig, ...(systemInstruction ? { systemInstruction } : {}) }),
+      body:    JSON.stringify({
+        contents,
+        generationConfig: resolvedGenerationConfig,
+        ...(systemInstruction ? { systemInstruction } : {}),
+      }),
     });
 
     const data = await upstream.json().catch(() => ({}));
