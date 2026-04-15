@@ -211,6 +211,47 @@ export default function FrameUploader({
     });
   };
 
+  // ── Inyectar consistencia de personaje al customPrompt ─────
+  const injectCharConsistency = (char, ci) => {
+    const imgs = char.images || {};
+    const lines = [
+      imgs.front         ? `FRONT_REF: ${imgs.front}`                 : null,
+      imgs.three_quarter ? `THREE_QUARTER_REF: ${imgs.three_quarter}` : null,
+      imgs.profile       ? `SIDE_REF: ${imgs.profile}`                : null,
+    ].filter(Boolean);
+    if (lines.length === 0) return;
+    const block = [
+      `SUBJECT ${ci + 1} — ${char.name || 'Personaje'}:`,
+      ...lines,
+      '[SACRED VISUAL REFERENCES — USE EXACTLY AS SHOWN. DO NOT change clothing, face, hair, or any physical feature.]',
+    ].join('\n');
+    const newPrompt = block + '\n\n' + (customPrompt || '');
+    setCustomPrompt(newPrompt);
+    setShowPrompt(true);
+    notifyChange({ customPrompt: newPrompt });
+  };
+
+  // ── Inyectar consistencia de escena al customPrompt ────────
+  const injectSceneConsistency = (scene, si) => {
+    const lines = [
+      scene.image_url             ? `SCENE_FRONTAL: ${scene.image_url}`             : null,
+      scene.image_url_lateral_der ? `SCENE_RIGHT: ${scene.image_url_lateral_der}`   : null,
+      scene.image_url_lateral_izq ? `SCENE_LEFT: ${scene.image_url_lateral_izq}`    : null,
+      scene.image_url_back        ? `SCENE_BACK: ${scene.image_url_back}`           : null,
+    ].filter(Boolean);
+    if (lines.length === 0) return;
+    const block = [
+      `SCENE ${si + 1} — ${scene.name || 'Escena'}:`,
+      scene.description ? `Setting: ${scene.description}` : null,
+      ...lines,
+      '[BACKGROUND REFERENCE — reproduce this environment EXACTLY. Do not invent locations or props.]',
+    ].filter(Boolean).join('\n');
+    const newPrompt = block + '\n\n' + (customPrompt || '');
+    setCustomPrompt(newPrompt);
+    setShowPrompt(true);
+    notifyChange({ customPrompt: newPrompt });
+  };
+
   const turnaroundCount = Object.values(turnaround).filter(Boolean).length;
   const totalCharImages = characters.reduce((sum, c) => sum + Object.values(c.images || {}).filter(Boolean).length, 0);
   const isReady = startUrl && endUrl;
@@ -525,6 +566,22 @@ export default function FrameUploader({
               La IA generará este personaje automáticamente basándose en el contexto de la escena
             </div>
           )}
+          {char.role !== 'extra' && Object.values(char.images || {}).some(Boolean) && (
+            <button
+              onClick={() => injectCharConsistency(char, ci)}
+              style={{
+                marginTop: 6, width: '100%', padding: '5px 0', borderRadius: 4, cursor: 'pointer',
+                fontSize: 9, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.06em',
+                background: customPrompt.includes(`SUBJECT ${ci + 1} —`)
+                  ? 'rgba(0,208,132,0.1)' : 'rgba(0,168,232,0.1)',
+                color: customPrompt.includes(`SUBJECT ${ci + 1} —`) ? C.success : C.accent,
+                border: `1px solid ${customPrompt.includes(`SUBJECT ${ci + 1} —`) ? C.success + '60' : C.accent + '50'}`,
+                transition: 'all 0.15s',
+              }}
+            >
+              {customPrompt.includes(`SUBJECT ${ci + 1} —`) ? '✓ CONSISTENCIA INYECTADA' : '📋 INYECTAR CONSISTENCIA AL PROMPT'}
+            </button>
+          )}
         </div>
       ))}
 
@@ -576,6 +633,40 @@ export default function FrameUploader({
               onFile={f => uploadTurnaround(f, 'profile')}
               onClear={() => { const u = { ...turnaround, profile: null }; setTurnaround(u); notifyChange({ turnaround: u }); }}
             />
+          </div>
+        </>
+      )}
+
+      {/* ── CONSISTENCIA DE ESCENA ───────────────────────────── */}
+      {sceneData.length > 0 && (
+        <>
+          <div style={styles.sectionHeader}>
+            <span style={styles.sectionLabel}>CONSISTENCIA DE ESCENA</span>
+            <span style={{ ...styles.sectionBadge, color: C.accent }}>{sceneData.length} escena(s) disponibles</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {sceneData.map((s, si) => {
+              const injected = customPrompt.includes(`SCENE ${si + 1} —`);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => !injected && injectSceneConsistency(s, si)}
+                  style={{
+                    padding: '5px 10px', borderRadius: 4, cursor: injected ? 'default' : 'pointer',
+                    fontSize: 9, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.06em',
+                    background: injected ? 'rgba(0,208,132,0.1)' : 'rgba(0,168,232,0.08)',
+                    color: injected ? C.success : C.accent,
+                    border: `1px solid ${injected ? C.success + '60' : C.accent + '40'}`,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {injected ? '✓' : '+'} {s.name || `Escena ${si + 1}`}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 8, color: C.dim, fontFamily: 'monospace', lineHeight: 1.5 }}>
+            Inyecta las referencias de escena en el prompt para que el DAG reproduzca la locación exacta
           </div>
         </>
       )}
