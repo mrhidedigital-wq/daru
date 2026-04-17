@@ -658,9 +658,13 @@ async function generateWithSeedDanceBytePlus({
   const duration = Math.min(Math.max(durationSeconds || 5, 4), 15);
   const ratio    = aspectRatio === '9:16' ? '9:16' : aspectRatio === '1:1' ? '1:1' : '16:9';
 
-  // Para 1.5 Pro embeber duration y ratio en el prompt; 2.0 los recibe en parameters.
+  // Para 1.5 Pro embeber duration y resolution en el prompt; 2.0 los recibe en parameters.
+  // Formato BytePlus 1.5: --resolution W:H (no --ratio)
+  const resolutionMap = { '9:16': '720:1280', '1:1': '960:960' };
+  const resolution    = resolutionMap[aspectRatio] || '1280:720';
+
   const textPrompt = is15
-    ? `${prompt} --duration ${duration} --ratio ${ratio}`
+    ? `${prompt} --duration ${duration} --resolution ${resolution} --camerafixed false`
     : prompt;
 
   // Construir el array content según el modo de entrada.
@@ -743,7 +747,9 @@ async function generateWithSeedDanceBytePlus({
     const status   = pollData?.status;
 
     if (status === 'succeeded' || status === 'completed') {
-      const url = pollData?.output?.video_url || pollData?.video_url;
+      const url = pollData?.content?.[0]?.video_url?.url
+               || pollData?.output?.video_url
+               || pollData?.video_url;
       if (!url) throw new Error('BytePlus SeedDance returned no video URL');
       return { done: true, videoUrl: url };
     }
