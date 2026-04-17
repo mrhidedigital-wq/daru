@@ -652,43 +652,66 @@ async function generateWithSeedDanceBytePlus({
   const apiKey = await resolveKey('byteplus_api_key', 'REACT_APP_BYTEPLUS_API_KEY');
   if (!apiKey) throw new Error('BytePlus API key no configurada. Agrégala en Ajustes → API Keys.');
 
-  // Construir el array content según el modo de entrada
+  const is15 = byteplusModel === 'seedance-1-5-pro-251215';
+
+  // SeedDance 1.5 acepta parámetros inline en el texto; 2.0 los acepta como campos separados.
+  const duration = Math.min(Math.max(durationSeconds || 5, 4), 15);
+  const ratio    = aspectRatio === '9:16' ? '9:16' : aspectRatio === '1:1' ? '1:1' : '16:9';
+
+  // Para 1.5 Pro embeber duration y ratio en el prompt; 2.0 los recibe en parameters.
+  const textPrompt = is15
+    ? `${prompt} --duration ${duration} --ratio ${ratio}`
+    : prompt;
+
+  // Construir el array content según el modo de entrada.
+  // 1.5 Pro: sin campo "role" en los items (BytePlus lo rechaza para este modelo).
+  // 2.0:     incluye "role" para first_frame / last_frame / reference_image / reference_video.
   const content = [];
 
-  // SeedDance 1.5 no soporta reference_video — omitir motionRef para ese modelo
-  const supportsMotionRef = byteplusModel !== 'seedance-1-5-pro-251215';
+  // SeedDance 1.5 no soporta reference_video
+  const supportsMotionRef = !is15;
 
   if (motionRef && supportsMotionRef) {
     // Omni reference: imagen del personaje + video de movimiento (solo 2.0)
     const turnaroundUrls = Object.values(turnaround || {}).filter(Boolean);
-    content.push({ type: 'text', text: prompt });
+    content.push({ type: 'text', text: textPrompt });
     if (turnaroundUrls.length > 0) {
       content.push({ type: 'image_url', image_url: { url: turnaroundUrls[0] }, role: 'reference_image' });
     }
     content.push({ type: 'video_url', video_url: { url: motionRef }, role: 'reference_video' });
   } else if (startUrl && endUrl) {
-    // First + Last frame
-    content.push({ type: 'text', text: prompt });
-    content.push({ type: 'image_url', image_url: { url: startUrl }, role: 'first_frame' });
-    content.push({ type: 'image_url', image_url: { url: endUrl },   role: 'last_frame' });
+    content.push({ type: 'text', text: textPrompt });
+    content.push(is15
+      ? { type: 'image_url', image_url: { url: startUrl } }
+      : { type: 'image_url', image_url: { url: startUrl }, role: 'first_frame' }
+    );
+    content.push(is15
+      ? { type: 'image_url', image_url: { url: endUrl } }
+      : { type: 'image_url', image_url: { url: endUrl },   role: 'last_frame' }
+    );
   } else if (startUrl) {
-    // Solo first frame
-    content.push({ type: 'text', text: prompt });
-    content.push({ type: 'image_url', image_url: { url: startUrl }, role: 'first_frame' });
+    content.push({ type: 'text', text: textPrompt });
+    content.push(is15
+      ? { type: 'image_url', image_url: { url: startUrl } }
+      : { type: 'image_url', image_url: { url: startUrl }, role: 'first_frame' }
+    );
   } else {
-    // Solo texto
-    content.push({ type: 'text', text: prompt });
+    content.push({ type: 'text', text: textPrompt });
   }
 
-  const body = {
-    model:   byteplusModel,
-    content,
-    parameters: {
-      watermark: removeWatermark ? false : true,
-      ratio:     aspectRatio === '9:16' ? '9:16' : aspectRatio === '1:1' ? '1:1' : '16:9',
-      duration:  Math.min(Math.max(durationSeconds || 5, 4), 15),
-    },
-  };
+  // 1.5 Pro: body mínimo { model, content } — sin parameters (BytePlus lo rechaza).
+  // 2.0:     body completo con parameters { watermark, ratio, duration }.
+  const body = is15
+    ? { model: byteplusModel, content }
+    : {
+        model:   byteplusModel,
+        content,
+        parameters: {
+          watermark: removeWatermark ? false : true,
+          ratio,
+          duration,
+        },
+      };
 
   // Enrutar a través del proxy backend (evita CORS del browser).
   // Mismo patrón que generateWithVeo → /api/veo/generate.
