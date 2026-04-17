@@ -745,10 +745,8 @@ async function generateWithSeedDanceBytePlus({
     const pollData = await pollRes.json();
     const status   = pollData?.status;
 
-    if (status === 'succeeded' || status === 'completed') {
-      const url = pollData?.content?.[0]?.video_url?.url
-               || pollData?.output?.video_url
-               || pollData?.video_url;
+    if (status === 'succeeded') {
+      const url = pollData?.content?.video_url;
       if (!url) throw new Error('BytePlus SeedDance returned no video URL');
       return { done: true, videoUrl: url };
     }
