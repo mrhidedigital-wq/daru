@@ -4,11 +4,7 @@
   "framework": "create-react-app",
 
   "functions": {
-    "api/veo/generate.js":  { "maxDuration": 30 },
-    "api/veo/poll.js":      { "maxDuration": 30 },
-    "api/veo/extend.js":    { "maxDuration": 30 },
-    "api/llm/complete.js":  { "maxDuration": 30 },
-    "api/export.js":        { "maxDuration": 60 }
+    "api/**/*.js": { "maxDuration": 300 }
   },
 
   "rewrites": [
