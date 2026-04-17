@@ -200,7 +200,7 @@ async function extendWithVeo({ videoUrl, gcsUri, prompt, aspectRatio, targetSeco
     console.log(`[veo-extend] Extensión ${i + 1} completada`);
   }
 
-  // Trim final al targetSeconds exacto via /api/video/finalize
+  // Trim final al targetSeconds exacto via /api/media (action='finalize')
   console.log(`[veo-extend] Trimming a ${targetSeconds}s exactos`);
   const finalizeRes = await fetch(`${serverUrl}/api/media`, {
     method:  'POST',
@@ -721,7 +721,7 @@ async function generateWithSeedDanceBytePlus({
       };
 
   // Enrutar a través del proxy backend (evita CORS del browser).
-  // Mismo patrón que generateWithVeo → /api/veo/generate.
+  // Mismo patrón que generateWithVeo → /api/veo (action='generate').
   const serverUrl = process.env.REACT_APP_SERVER_URL || '';
 
   const res = await fetch(`${serverUrl}/api/byteplus`, {
@@ -741,10 +741,10 @@ async function generateWithSeedDanceBytePlus({
 
   // Poll task status via proxy
   const { videoUrl } = await pollUntilDone(async () => {
-    const pollRes  = await fetch(`${serverUrl}/api/byteplus/poll`, {
+    const pollRes  = await fetch(`${serverUrl}/api/byteplus`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ taskId, apiKey }),
+      body:    JSON.stringify({ action: 'poll', taskId, apiKey }),
     });
     const pollData = await pollRes.json();
     const status   = pollData?.status;
@@ -811,10 +811,11 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
 
   input.mode = mode;
 
-  const res = await fetch(`${serverUrl}/api/piapi/generate`, {
+  const res = await fetch(`${serverUrl}/api/piapi`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({
+      action: 'generate',
       body: { model: 'Qingying', task_type: taskType, input },
       apiKey,
     }),
@@ -831,10 +832,10 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
 
   // Poll via proxy
   const { videoUrl } = await pollUntilDone(async () => {
-    const pollRes  = await fetch(`${serverUrl}/api/piapi/poll`, {
+    const pollRes  = await fetch(`${serverUrl}/api/piapi`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ taskId, apiKey }),
+      body:    JSON.stringify({ action: 'poll', taskId, apiKey }),
     });
     const pollData = await pollRes.json();
     const status   = pollData?.data?.status || pollData?.status;
@@ -863,10 +864,11 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
 // Si el task falla devuelve el video original sin lanzar error — no bloquea la entrega.
 async function _removePiAPIWatermark(apiKey, sourceTaskId, fallbackUrl, serverUrl = '') {
   try {
-    const res = await fetch(`${serverUrl}/api/piapi/generate`, {
+    const res = await fetch(`${serverUrl}/api/piapi`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        action: 'generate',
         body: {
           model:     'Qingying',
           task_type: 'remove-watermark',
@@ -886,10 +888,10 @@ async function _removePiAPIWatermark(apiKey, sourceTaskId, fallbackUrl, serverUr
     if (!wmTask) return fallbackUrl;
 
     const { videoUrl } = await pollUntilDone(async () => {
-      const pollRes  = await fetch(`${serverUrl}/api/piapi/poll`, {
+      const pollRes  = await fetch(`${serverUrl}/api/piapi`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ taskId: wmTask, apiKey }),
+        body:    JSON.stringify({ action: 'poll', taskId: wmTask, apiKey }),
       });
       const pollData = await pollRes.json();
       const status   = pollData?.data?.status || pollData?.status;

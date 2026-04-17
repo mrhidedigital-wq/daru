@@ -60,7 +60,7 @@
 import { urlToInlineData } from './assetUtils';
 
 // ─── Modelos Gemini ───────────────────────────────────────────────────────────
-// El modelo se pasa en el body; el proxy en /api/gemini/proxy lo lee de req.body.model
+// El modelo se pasa en el body; el proxy en /api/llm (action='gemini-proxy') lo lee de req.body.model
 const GEMINI_TEXT_MODEL  = 'gemini-2.5-flash';
 const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
 
