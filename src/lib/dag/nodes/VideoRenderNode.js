@@ -663,8 +663,8 @@ async function generateWithSeedDanceBytePlus({
 
   // Para 1.5 Pro embeber duration y resolution en el prompt; 2.0 los recibe en parameters.
   // Formato BytePlus 1.5: --resolution W:H (no --ratio)
-  const resolutionMap = { '9:16': '720:1280', '1:1': '960:960' };
-  const resolution    = resolutionMap[aspectRatio] || '1280:720';
+  const resolutionMap = { '9:16': '720:1280', '1:1': '960:960', '4:3': '1280:960', '3:4': '960:1280' };
+  const resolution    = resolutionMap[aspectRatio] || '1280:720'; // default 16:9
 
   const textPrompt = is15
     ? `${prompt} --duration ${duration} --resolution ${resolution} --camerafixed false`
