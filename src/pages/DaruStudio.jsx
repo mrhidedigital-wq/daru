@@ -61,6 +61,33 @@ const PROVIDER_FORMATS = {
       '480p': 'Solo para preview/draft. Muy bajo costo.',
     },
   },
+  seeddance_byteplus: {
+    resolutions: ['480p', '720p', '1080p'],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    defaultResolution: '720p',
+    defaultAspectRatio: '16:9',
+    resolutionWarnings: {
+      '480p': 'Solo para preview/draft.',
+    },
+  },
+  seeddance_byteplus_15: {
+    resolutions: ['480p', '720p', '1080p'],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    defaultResolution: '720p',
+    defaultAspectRatio: '16:9',
+    resolutionWarnings: {
+      '480p': 'Solo para preview/draft.',
+    },
+  },
+  seeddance_piapi: {
+    resolutions: ['480p', '720p', '1080p'],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    defaultResolution: '720p',
+    defaultAspectRatio: '16:9',
+    resolutionWarnings: {
+      '480p': 'Solo para preview/draft.',
+    },
+  },
 };
 
 const RESOLUTION_LABELS = {
@@ -522,14 +549,6 @@ const template = newShotTemplate(maxShotNumber);
   if (!selectedShot) return;
   const frames = getSceneExtendedFrames(selectedShot);
 
-  console.log('SERVER URL', process.env.REACT_APP_SERVER_URL);
-  console.log('SHOT ID', selectedShot.id);
-  console.log('RAW SHOT FRAMES', shotFrames[selectedShot.id]);
-  console.log('FRAMES USED FOR RENDER', frames);
-  console.log('START URL', frames.startUrl);
-  console.log('END URL', frames.endUrl);
-
-
     const hasCustomPrompt = !!(shotFrames[selectedShot.id]?.customPrompt?.trim());
     const hasStartUrl     = !!(shotFrames[selectedShot.id]?.startUrl);
     const hasAction       = !!(shotFrames[selectedShot.id]?.action?.trim());
@@ -553,6 +572,11 @@ const template = newShotTemplate(maxShotNumber);
     setError(null);
 
     try {
+      // Garantizar que el shot existe en DB antes de cualquier .update().
+      // Evita "Cannot coerce the result to a single JSON object" cuando la tabla
+      // fue borrada externamente pero React todavía retiene el objeto con su UUID.
+      await shotsDB.upsert(projectId, selectedShot);
+
       await shotsDB.updateStatus(selectedShot.id, 'processing');
 
       // Prompt: customPrompt si existe; si no, acción como prompt automático.
@@ -867,7 +891,10 @@ const template = newShotTemplate(maxShotNumber);
                 >
                   <option value="veo">Veo 3.1 — ${estimateCost('veo', selectedShot?.duration_seconds || 5)}</option>
                   <option value="kling">Kling 3.0 — ${estimateCost('kling', selectedShot?.duration_seconds || 5)}</option>
-                  <option value="seeddance">SeedDance 2.0 — ${estimateCost('seeddance', selectedShot?.duration_seconds || 5)}</option>
+                  <option value="seeddance">SeedDance 2.0 AIMLAPI — ${estimateCost('seeddance', selectedShot?.duration_seconds || 5)}</option>
+                  <option value="seeddance_byteplus">SeedDance 2.0 BytePlus — ${estimateCost('seeddance_byteplus', selectedShot?.duration_seconds || 5)}</option>
+                  <option value="seeddance_byteplus_15">SeedDance 1.5 Pro BytePlus — ${estimateCost('seeddance_byteplus_15', selectedShot?.duration_seconds || 5)}</option>
+                  <option value="seeddance_piapi">SeedDance 2.0 PiAPI — ${estimateCost('seeddance_piapi', selectedShot?.duration_seconds || 5)}</option>
                 </select>
                 <div style={{ fontSize: 8, color: '#555', fontFamily: 'monospace', lineHeight: 1.3, maxWidth: 100 }}>
                   {PROVIDER_COSTS[mediaProvider]?.note}

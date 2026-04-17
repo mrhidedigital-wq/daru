@@ -342,6 +342,8 @@ export class DAGExecutor {
           characters:      this._renderConfig.characters || [],
           aspectRatio:     this._renderConfig.aspectRatio || '16:9',
           durationSeconds: this._renderConfig.durationSeconds || 8,
+          removeWatermark: this._renderConfig.removeWatermark ?? false,
+          piapiModel:      this._renderConfig.piapiModel || 'pro',
         },
       });
 
@@ -656,18 +658,20 @@ export async function buildAndExecuteDAG(shot, options = {}) {
     }
 
     const node = new VideoRenderNode({
-      mediaProvider:   options.mediaProvider         || 'veo',
-      startUrl:        options.frames.startUrl       || null,
-      endUrl:          options.frames.endUrl         || null,
+      mediaProvider:   options.mediaProvider            || 'veo',
+      startUrl:        options.frames.startUrl          || null,
+      endUrl:          options.frames.endUrl            || null,
       turnaround:      mergedTurnaround,
-      motionRef:       options.frames.motionRef      || null,
-      action:          options.frames.action         || '',
-      frameMode:       options.frames.frameMode      || 'exact',
+      motionRef:       options.frames.motionRef         || null,
+      action:          options.frames.action            || '',
+      frameMode:       options.frames.frameMode         || 'exact',
       characters:      [],   // ya procesados arriba en turnaround
-      aspectRatio:     options.aspectRatio           || shot.project?.format || '16:9',
-      durationSeconds: shot.duration_seconds         || 8,
-      prompt:          options.customPrompt,         // prompt del usuario — sin tocar
-      isManualPrompt:  true,                         // impide que VideoRenderNode modifique el prompt
+      aspectRatio:     options.aspectRatio              || shot.project?.format || '16:9',
+      durationSeconds: shot.duration_seconds            || 8,
+      prompt:          options.customPrompt,            // prompt del usuario — sin tocar
+      isManualPrompt:  true,                            // impide que VideoRenderNode modifique el prompt
+      removeWatermark: options.frames.removeWatermark   ?? false,
+      piapiModel:      options.frames.piapiModel        || 'pro',
       // ── Performance del personaje ─────────────────────────
       shotMode:        options.shotMode    || 'cinematic',
       speechRate:      options.speechRate  || 'normal',
@@ -723,16 +727,18 @@ export async function buildAndExecuteDAG(shot, options = {}) {
     }
 
     executor._renderConfig = {
-      mediaProvider:   options.mediaProvider         || 'veo',
-      startUrl:        options.frames.startUrl       || null,
-      endUrl:          options.frames.endUrl         || null,
+      mediaProvider:   options.mediaProvider            || 'veo',
+      startUrl:        options.frames.startUrl          || null,
+      endUrl:          options.frames.endUrl            || null,
       turnaround:      mergedTurnaround,
-      motionRef:       options.frames.motionRef      || null,
-      action:          options.frames.action         || '',
-      frameMode:       options.frames.frameMode      || 'exact',
+      motionRef:       options.frames.motionRef         || null,
+      action:          options.frames.action            || '',
+      frameMode:       options.frames.frameMode         || 'exact',
       characters:      [],   // ya procesados en turnaround
-      aspectRatio:     options.aspectRatio           || shot.project?.format || '16:9',
-      durationSeconds: shot.duration_seconds         || 8,
+      aspectRatio:     options.aspectRatio              || shot.project?.format || '16:9',
+      durationSeconds: shot.duration_seconds            || 8,
+      removeWatermark: options.frames.removeWatermark   ?? false,
+      piapiModel:      options.frames.piapiModel        || 'pro',
     };
   }
 

@@ -31,10 +31,24 @@ const STATIC_KEYS = [
       },
       {
         keyName:     'seeddance_api_key',
-        label:       'SEEDDANCE API KEY',
-        description: 'AIMLAPI — Seedance 2.0 / character consistency',
+        label:       'SEEDDANCE API KEY (AIMLAPI)',
+        description: 'AIMLAPI — SeedDance 1.5 Pro vía AIMLAPI',
         placeholder: 'Bearer ...',
         link:        'https://aimlapi.com',
+      },
+      {
+        keyName:     'byteplus_api_key',
+        label:       'BYTEPLUS API KEY',
+        description: 'BytePlus Ark — SeedDance 2.0 y 1.5 Pro directo de ByteDance (sin watermark nativo)',
+        placeholder: 'ark-...',
+        link:        'https://console.byteplus.com/ark',
+      },
+      {
+        keyName:     'piapi_api_key',
+        label:       'PIAPI API KEY',
+        description: 'PiAPI — SeedDance 2.0 vía intermediario (Pro $0.13/s, Fast $0.10/s)',
+        placeholder: 'pi-...',
+        link:        'https://piapi.ai',
       },
       {
         keyName:     'google_cloud_project',
@@ -170,6 +184,8 @@ export default function ApiKeysSettings() {
   const [values,   setValues]   = useState({
     kling_api_key:        '',
     seeddance_api_key:    '',
+    byteplus_api_key:     '',
+    piapi_api_key:        '',
     gemini_api_key:       '',
     google_cloud_project: '',
     vertex_access_token:  '',
@@ -469,21 +485,7 @@ export default function ApiKeysSettings() {
           </div>
         </div>
 
-        {/* ── Info Vercel ──────────────────────────────────── */}
-        <div style={{
-          background: 'rgba(0,168,232,0.05)',
-          border: `1px solid rgba(0,168,232,0.2)`,
-          borderRadius: 5, padding: '12px 14px',
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: C.accent, fontFamily: 'monospace', letterSpacing: '0.1em', marginBottom: 6 }}>
-            ◈ DESPLIEGUE EN VERCEL
-          </div>
-          <div style={{ fontSize: 9, color: C.muted, fontFamily: 'monospace', lineHeight: 1.7 }}>
-            Solo necesitas 2 variables de entorno en Vercel:<br />
-            <code style={{ color: C.text }}>REACT_APP_SUPABASE_URL</code> y <code style={{ color: C.text }}>REACT_APP_SUPABASE_ANON_KEY</code><br /><br />
-            Todas las demás keys (Kling, SeedDance, Gemini, Vertex) se leen desde esta página en runtime.
-          </div>
-        </div>
+       
 
       </div>
     </div>

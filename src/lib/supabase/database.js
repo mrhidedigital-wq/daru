@@ -251,6 +251,39 @@ export const shotsDB = {
   },
 
   /**
+   * Upsert de un shot — INSERT si no existe, no-op si ya existe.
+   * Usa onConflict: 'id' para preservar el UUID original.
+   * Llamar antes de cualquier .update() cuando el shot puede haber sido
+   * borrado de la DB mientras el estado de React aún lo retiene.
+   *
+   * @param {string} projectId
+   * @param {object} shotData  — objeto shot completo (selectedShot)
+   */
+  async upsert(projectId, shotData) {
+    const { data, error } = await supabase
+      .from('shots')
+      .upsert(
+        {
+          id:               shotData.id,
+          project_id:       projectId,
+          shot_number:      shotData.shot_number      || 1,
+          name:             shotData.name             || `Shot ${shotData.shot_number || 1}`,
+          duration_seconds: shotData.duration_seconds || shotData.durationSec || 4,
+          frame_start:      shotData.frame_start      || {},
+          frame_end:        shotData.frame_end        || {},
+          transition:       shotData.transition       || {},
+          status:           shotData.status           || 'pending',
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
+      .select()
+      .maybeSingle();
+
+    if (error) throw new Error(`shotsDB.upsert: ${error.message}`);
+    return data;
+  },
+
+  /**
    * Eliminar un shot
    */
   async delete(shotId) {

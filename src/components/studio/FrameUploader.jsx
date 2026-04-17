@@ -43,7 +43,9 @@ export default function FrameUploader({
   const [characters, setCharacters]   = useState(shot?.frame_start?.characters || [
     { id: 'char_1', name: 'Personaje 1', role: 'principal', images: {} },
   ]);
-  const [motionRef,     setMotionRef]     = useState(null);
+  const [motionRef,       setMotionRef]       = useState(null);
+  const [removeWatermark, setRemoveWatermark] = useState(false);
+  const [piapiModel,      setPiapiModel]      = useState('pro');
   const [uploading,     setUploading]     = useState({});
   const [error,         setError]         = useState(null);
   const [customPrompt,  setCustomPrompt]  = useState(shot?.customPrompt || '');
@@ -207,6 +209,8 @@ export default function FrameUploader({
       dialogue,
       sameScene,
       subjectType,
+      removeWatermark,
+      piapiModel,
       ...patch,
     });
   };
@@ -671,8 +675,8 @@ export default function FrameUploader({
         </>
       )}
 
-      {/* ── MOTION REFERENCE (solo SeedDance) ───────────────── */}
-      {mediaProvider === 'seeddance' && (
+      {/* ── MOTION REFERENCE (SeedDance todos los providers) ── */}
+      {(mediaProvider === 'seeddance' || mediaProvider === 'seeddance_byteplus' || mediaProvider === 'seeddance_piapi') && (
         <>
           <div style={styles.sectionHeader}>
             <span style={styles.sectionLabel}>REFERENCIA DE MOVIMIENTO</span>
@@ -720,6 +724,54 @@ export default function FrameUploader({
             onChange={e => { const f = e.target.files?.[0]; if (f) uploadMotionRef(f); e.target.value = ''; }}
           />
         </>
+      )}
+
+      {/* ── REMOVE WATERMARK (BytePlus nativo / PiAPI encadenado) */}
+      {(mediaProvider === 'seeddance_byteplus' || mediaProvider === 'seeddance_byteplus_15' || mediaProvider === 'seeddance_piapi') && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={removeWatermark}
+              onChange={e => { setRemoveWatermark(e.target.checked); notifyChange({ removeWatermark: e.target.checked }); }}
+              style={{ accentColor: C.success, cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: 10, fontFamily: 'monospace', color: C.text, letterSpacing: '0.04em' }}>
+              Sin watermark
+              {(mediaProvider === 'seeddance_byteplus' || mediaProvider === 'seeddance_byteplus_15') && (
+                <span style={{ color: C.success, marginLeft: 6, fontSize: 9 }}>— gratis (nativo BytePlus)</span>
+              )}
+              {mediaProvider === 'seeddance_piapi' && (
+                <span style={{ color: C.warning, marginLeft: 6, fontSize: 9 }}>— +$0.008/s (remove-watermark task)</span>
+              )}
+            </span>
+          </label>
+
+          {/* Selector Pro / Fast solo para PiAPI */}
+          {mediaProvider === 'seeddance_piapi' && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[
+                { key: 'pro',  label: 'PRO  $0.13/s',  color: C.accent },
+                { key: 'fast', label: 'FAST $0.10/s',  color: C.success },
+              ].map(({ key, label, color }) => (
+                <button
+                  key={key}
+                  onClick={() => { setPiapiModel(key); notifyChange({ piapiModel: key }); }}
+                  style={{
+                    flex: 1, padding: '6px 0', borderRadius: 4, cursor: 'pointer',
+                    fontSize: 9, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.08em',
+                    background: piapiModel === key ? color : '#1A1A1A',
+                    color: piapiModel === key ? '#000' : C.muted,
+                    border: `1px solid ${piapiModel === key ? color : C.border}`,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── PROMPT MANUAL (con IA integrada) ─────────────────── */}

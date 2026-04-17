@@ -66,9 +66,12 @@ export function invalidateKeyCache(keyName) {
 }
 
 const PROVIDERS = {
-  veo:       'veo',
-  kling:     'kling',
-  seeddance: 'seeddance',
+  veo:                   'veo',
+  kling:                 'kling',
+  seeddance:             'seeddance',
+  seeddance_byteplus:    'seeddance_byteplus',
+  seeddance_byteplus_15: 'seeddance_byteplus_15',
+  seeddance_piapi:       'seeddance_piapi',
 };
 
 // ─── Polling helper ───────────────────────────────────────────
@@ -642,6 +645,256 @@ async function generateWithSeedDance({ prompt, startUrl, endUrl, turnaround, mot
   return videoUrl;
 }
 
+// ─── SEEDDANCE — BytePlus (directo de ByteDance) ──────────────
+//
+// Ventaja clave: watermark nativo — watermark:false entrega video limpio.
+// Endpoint:  https://ark.ap-southeast.bytepluses.com/api/v3
+// Modelos soportados:
+//   dreamina-seedance-2-0-260128  → SeedDance 2.0 (default)
+//   seedance-1-5-pro-251215       → SeedDance 1.5 Pro (sin reference_video)
+//
+async function generateWithSeedDanceBytePlus({
+  prompt, startUrl, endUrl, turnaround, motionRef,
+  aspectRatio, durationSeconds, removeWatermark,
+  byteplusModel = 'dreamina-seedance-2-0-260128',
+}) {
+  const apiKey = await resolveKey('byteplus_api_key', 'REACT_APP_BYTEPLUS_API_KEY');
+  if (!apiKey) throw new Error('BytePlus API key no configurada. Agrégala en Ajustes → API Keys.');
+
+  const BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
+
+  // Construir el array content según el modo de entrada
+  const content = [];
+
+  // SeedDance 1.5 no soporta reference_video — omitir motionRef para ese modelo
+  const supportsMotionRef = byteplusModel !== 'seedance-1-5-pro-251215';
+
+  if (motionRef && supportsMotionRef) {
+    // Omni reference: imagen del personaje + video de movimiento (solo 2.0)
+    const turnaroundUrls = Object.values(turnaround || {}).filter(Boolean);
+    content.push({ type: 'text', text: prompt });
+    if (turnaroundUrls.length > 0) {
+      content.push({ type: 'image_url', image_url: { url: turnaroundUrls[0] }, role: 'reference_image' });
+    }
+    content.push({ type: 'video_url', video_url: { url: motionRef }, role: 'reference_video' });
+  } else if (startUrl && endUrl) {
+    // First + Last frame
+    content.push({ type: 'text', text: prompt });
+    content.push({ type: 'image_url', image_url: { url: startUrl }, role: 'first_frame' });
+    content.push({ type: 'image_url', image_url: { url: endUrl },   role: 'last_frame' });
+  } else if (startUrl) {
+    // Solo first frame
+    content.push({ type: 'text', text: prompt });
+    content.push({ type: 'image_url', image_url: { url: startUrl }, role: 'first_frame' });
+  } else {
+    // Solo texto
+    content.push({ type: 'text', text: prompt });
+  }
+
+  const body = {
+    model:   byteplusModel,
+    content,
+    parameters: {
+      watermark: removeWatermark ? false : true,
+      ratio:     aspectRatio === '9:16' ? '9:16' : aspectRatio === '1:1' ? '1:1' : '16:9',
+      duration:  Math.min(Math.max(durationSeconds || 5, 4), 15),
+    },
+  };
+
+  const res = await fetch(`${BASE}/video/generation`, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`BytePlus SeedDance API error: ${err?.error?.message || err?.message || res.status}`);
+  }
+
+  const data    = await res.json();
+  const taskId  = data?.task_id || data?.id;
+  if (!taskId) throw new Error('BytePlus SeedDance returned no task ID');
+
+  // Poll task status
+  const { videoUrl } = await pollUntilDone(async () => {
+    const pollRes  = await fetch(`${BASE}/video/generation/${taskId}`, {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    const pollData = await pollRes.json();
+    const status   = pollData?.status;
+
+    if (status === 'succeeded' || status === 'completed') {
+      const url = pollData?.output?.video_url || pollData?.video_url;
+      if (!url) throw new Error('BytePlus SeedDance returned no video URL');
+      return { done: true, videoUrl: url };
+    }
+    if (status === 'failed' || status === 'error') {
+      throw new Error(`BytePlus SeedDance failed: ${pollData?.error?.message || 'Unknown error'}`);
+    }
+    return { done: false };
+  }, 10000, 48);
+
+  return videoUrl;
+}
+
+// ─── SEEDDANCE 2.0 — PiAPI (intermediario) ────────────────────
+//
+// Watermark: el video sale con watermark por defecto.
+// Si removeWatermark=true, se encadena un task "remove-watermark" ($0.008/s).
+// Modelos: seedance-2 (Pro $0.13/s) o seedance-2-fast ($0.10/s)
+//
+async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround, motionRef, aspectRatio, durationSeconds, removeWatermark, piapiModel = 'pro' }) {
+  const apiKey = await resolveKey('piapi_api_key', 'REACT_APP_PIAPI_API_KEY');
+  if (!apiKey) throw new Error('PiAPI key no configurada. Agrégala en Ajustes → API Keys.');
+
+  const BASE     = 'https://api.piapi.ai/api/v1/task';
+  const taskType = piapiModel === 'fast' ? 'seedance-2-fast' : 'seedance-2';
+
+  // Construir input según modo
+  let mode;
+  const input = {
+    aspect_ratio: aspectRatio === '9:16' ? '9:16' : aspectRatio === '1:1' ? '1:1' : '16:9',
+    duration:     Math.min(Math.max(durationSeconds || 5, 4), 15),
+  };
+
+  if (motionRef) {
+    // Omni reference: @image1 y @video1 en el prompt
+    mode = 'omni_reference';
+    const turnaroundUrls = Object.values(turnaround || {}).filter(Boolean);
+    if (turnaroundUrls.length > 0) {
+      input.prompt = `@image1 ${prompt}. Follow @video1 camera movement and style.`;
+      input.image1 = turnaroundUrls[0];
+    } else {
+      input.prompt = `${prompt}. Follow @video1 camera movement and style.`;
+    }
+    input.video1 = motionRef;
+  } else if (startUrl && endUrl) {
+    // First + Last frame
+    mode = 'first_last_frames';
+    input.prompt            = prompt;
+    input.first_frame_image = startUrl;
+    input.last_frame_image  = endUrl;
+  } else if (startUrl) {
+    // Solo first frame — PiAPI acepta first_last_frames con solo first_frame_image
+    mode = 'first_last_frames';
+    input.prompt            = prompt;
+    input.first_frame_image = startUrl;
+  } else {
+    // Solo texto
+    mode = 'text_to_video';
+    input.prompt = prompt;
+  }
+
+  input.mode = mode;
+
+  const res = await fetch(BASE, {
+    method:  'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key':    apiKey,
+    },
+    body: JSON.stringify({
+      model:     'Qingying',
+      task_type: taskType,
+      input,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`PiAPI SeedDance error: ${err?.message || err?.error?.message || res.status}`);
+  }
+
+  const data   = await res.json();
+  const taskId = data?.data?.task_id || data?.task_id;
+  if (!taskId) throw new Error('PiAPI returned no task ID');
+
+  // Poll task status
+  const { videoUrl } = await pollUntilDone(async () => {
+    const pollRes  = await fetch(`${BASE}/${taskId}`, {
+      headers: { 'X-API-Key': apiKey },
+    });
+    const pollData = await pollRes.json();
+    const status   = pollData?.data?.status || pollData?.status;
+
+    if (status === 'completed' || status === 'succeed') {
+      const url = pollData?.data?.output?.video_url
+               || pollData?.output?.video_url;
+      if (!url) throw new Error('PiAPI returned no video URL');
+      return { done: true, videoUrl: url };
+    }
+    if (status === 'failed' || status === 'error') {
+      throw new Error(`PiAPI SeedDance failed: ${pollData?.data?.error?.message || 'Unknown error'}`);
+    }
+    return { done: false };
+  }, 10000, 48);
+
+  // Encadenar remove-watermark si el usuario lo activó
+  if (removeWatermark) {
+    return _removePiAPIWatermark(apiKey, taskId, videoUrl);
+  }
+
+  return videoUrl;
+}
+
+// Helper: quita el watermark de un video de PiAPI vía task "remove-watermark"
+// Si el task falla devuelve el video original sin lanzar error — no bloquea la entrega.
+async function _removePiAPIWatermark(apiKey, sourceTaskId, fallbackUrl) {
+  const BASE = 'https://api.piapi.ai/api/v1/task';
+
+  try {
+    const res = await fetch(BASE, {
+      method:  'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key':    apiKey,
+      },
+      body: JSON.stringify({
+        model:     'Qingying',
+        task_type: 'remove-watermark',
+        input:     { task_id: sourceTaskId },
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn('[PiAPI] remove-watermark request failed — entregando video con watermark');
+      return fallbackUrl;
+    }
+
+    const data   = await res.json();
+    const wmTask = data?.data?.task_id || data?.task_id;
+    if (!wmTask) return fallbackUrl;
+
+    const { videoUrl } = await pollUntilDone(async () => {
+      const pollRes  = await fetch(`${BASE}/${wmTask}`, {
+        headers: { 'X-API-Key': apiKey },
+      });
+      const pollData = await pollRes.json();
+      const status   = pollData?.data?.status || pollData?.status;
+
+      if (status === 'completed' || status === 'succeed') {
+        const url = pollData?.data?.output?.video_url || pollData?.output?.video_url;
+        return { done: true, videoUrl: url || fallbackUrl };
+      }
+      if (status === 'failed' || status === 'error') {
+        console.warn('[PiAPI] remove-watermark task failed — entregando video con watermark');
+        return { done: true, videoUrl: fallbackUrl };
+      }
+      return { done: false };
+    }, 8000, 30);
+
+    return videoUrl;
+
+  } catch (e) {
+    console.warn('[PiAPI] remove-watermark error:', e.message);
+    return fallbackUrl;
+  }
+}
+
 // ─── NODE CLASS ───────────────────────────────────────────────
 export class VideoRenderNode extends CinematicNode {
   constructor(config = {}) {
@@ -666,6 +919,10 @@ export class VideoRenderNode extends CinematicNode {
     this.aspectRatio     = config.aspectRatio     || p.aspectRatio     || '16:9';
     this.durationSeconds = config.durationSeconds || p.durationSeconds || 8;
     this._prompt         = config.prompt          || p.prompt          || null;
+    // Watermark: aplica a seeddance_byteplus (nativo) y seeddance_piapi (encadenado)
+    // Para AIMLAPI seeddance, se ignora silenciosamente
+    this.removeWatermark = config.removeWatermark ?? p.removeWatermark ?? false;
+    this.piapiModel      = config.piapiModel      || p.piapiModel      || 'pro';
   }
 
   // canExecute siempre true — no depende de otros nodos del DAG
@@ -740,6 +997,8 @@ export class VideoRenderNode extends CinematicNode {
       frameMode:       this.frameMode,
       aspectRatio:     this.aspectRatio,
       durationSeconds: this.durationSeconds,
+      removeWatermark: this.removeWatermark,
+      piapiModel:      this.piapiModel,
     };
 
     let videoUrl;
@@ -753,6 +1012,20 @@ export class VideoRenderNode extends CinematicNode {
         break;
       case PROVIDERS.seeddance:
         videoUrl = await generateWithSeedDance(shared);
+        break;
+      case PROVIDERS.seeddance_byteplus:
+        videoUrl = await generateWithSeedDanceBytePlus(shared);
+        break;
+      case PROVIDERS.seeddance_byteplus_15:
+        // SeedDance 1.5 Pro — mismo endpoint BytePlus, sin reference_video
+        videoUrl = await generateWithSeedDanceBytePlus({
+          ...shared,
+          motionRef:    null,  // 1.5 no soporta reference_video
+          byteplusModel: 'seedance-1-5-pro-251215',
+        });
+        break;
+      case PROVIDERS.seeddance_piapi:
+        videoUrl = await generateWithSeedDancePiAPI(shared);
         break;
       default:
         throw new Error(`Proveedor de video desconocido: ${this.mediaProvider}`);
@@ -793,13 +1066,40 @@ export const PROVIDER_COSTS = {
     note:          'Best value. Multi-shot up to 15s. Native audio.',
   },
   seeddance: {
-    name:          'SeedDance 2.0',
+    name:          'SeedDance 2.0 (AIMLAPI)',
     perSecond:     0.02,
     supportsFirst: true,
     supportsLast:  true,
     supportsRef:   true,  // omni_reference con video de movimiento
     maxDuration:   15,
-    note:          'Best consistency. Motion reference video support.',
+    note:          'Siempre con watermark. Motion reference.',
+  },
+  seeddance_byteplus: {
+    name:          'SeedDance 2.0 (BytePlus)',
+    perSecond:     0.09,  // ~$0.09/s ByteDance directo
+    supportsFirst: true,
+    supportsLast:  true,
+    supportsRef:   true,  // omni_reference
+    maxDuration:   15,
+    note:          'Sin watermark nativo. ByteDance directo.',
+  },
+  seeddance_byteplus_15: {
+    name:          'SeedDance 1.5 Pro — BytePlus',
+    perSecond:     0.02,
+    supportsFirst: true,
+    supportsLast:  true,
+    supportsRef:   true,  // reference_image (sin reference_video)
+    maxDuration:   15,
+    note:          'BytePlus directo. Créditos gratuitos.',
+  },
+  seeddance_piapi: {
+    name:          'SeedDance 2.0 (PiAPI Pro)',
+    perSecond:     0.13,  // Pro $0.13/s; Fast $0.10/s + $0.008/s remove-watermark
+    supportsFirst: true,
+    supportsLast:  true,
+    supportsRef:   true,  // omni_reference
+    maxDuration:   15,
+    note:          'Remove-watermark $0.008/s extra. Fast mode disponible.',
   },
 };
 

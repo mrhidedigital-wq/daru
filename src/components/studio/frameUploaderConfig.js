@@ -26,10 +26,40 @@ export const VIDEO_PROVIDERS = {
     audioSupport: true,
   },
   seeddance: {
-    label:    'Seedance 2.0',
+    label:    'SeedDance (AIMLAPI)',
     color:    '#9B6DD6',
     icon:     '◉',
     hint:     'Consistencia de personaje primero. @reference format. Repite identidad del sujeto en inicio y fin.',
+    formula:  '[Character Identity] + [Action/Pose] + [Environment] + [Camera] + [Style]',
+    maxTokens: 200,
+    forbidden: [],
+    audioSupport: false,
+  },
+  seeddance_byteplus: {
+    label:    'SeedDance 2.0 (BytePlus)',
+    color:    '#9B6DD6',
+    icon:     '◉',
+    hint:     'Consistencia de personaje primero. Sin watermark nativo. Mismo formato de prompt que SeedDance.',
+    formula:  '[Character Identity] + [Action/Pose] + [Environment] + [Camera] + [Style]',
+    maxTokens: 200,
+    forbidden: [],
+    audioSupport: false,
+  },
+  seeddance_byteplus_15: {
+    label:    'SeedDance 1.5 Pro (BytePlus)',
+    color:    '#9B6DD6',
+    icon:     '◉',
+    hint:     'Consistencia de personaje primero. Créditos gratuitos BytePlus. Mismo formato de prompt que SeedDance.',
+    formula:  '[Character Identity] + [Action/Pose] + [Environment] + [Camera] + [Style]',
+    maxTokens: 200,
+    forbidden: [],
+    audioSupport: false,
+  },
+  seeddance_piapi: {
+    label:    'SeedDance 2.0 (PiAPI)',
+    color:    '#9B6DD6',
+    icon:     '◉',
+    hint:     'Consistencia de personaje primero. @image1/@video1 references. Remove-watermark disponible.',
     formula:  '[Character Identity] + [Action/Pose] + [Environment] + [Camera] + [Style]',
     maxTokens: 200,
     forbidden: [],
@@ -215,7 +245,11 @@ export function buildDesglosarSystem(mediaProvider, subjects, scenes, options = 
     },
   };
 
-  const prov = VIDEO_PROVIDERS[mediaProvider] || VIDEO_PROVIDERS.veo;
+  // Normalizar variantes seeddance_* → 'seeddance' para reglas de prompting
+  // (todas usan el mismo modelo SeedDance, mismas reglas de composición de prompt)
+  const baseProvider = mediaProvider.startsWith('seeddance') ? 'seeddance' : mediaProvider;
+
+  const prov = VIDEO_PROVIDERS[mediaProvider] || VIDEO_PROVIDERS[baseProvider] || VIDEO_PROVIDERS.veo;
 
   const subjectCtx = subjects?.length > 0
     ? `\nPERSONAJES DEL PROYECTO:\n${subjects.map((s, i) =>
@@ -237,7 +271,7 @@ export function buildDesglosarSystem(mediaProvider, subjects, scenes, options = 
 
 Tu tarea: analizar la descripción del usuario y extraer TODO lo necesario para generar un video de una persona hablando a cámara con ${prov.label}.
 
-CONTEXTO DE CÁMARA: ${CAMERA_ANGLE_MAP[cameraAngle]?.[mediaProvider] || CAMERA_ANGLE_MAP[cameraAngle]?.veo || 'frontal medium shot'}
+CONTEXTO DE CÁMARA: ${CAMERA_ANGLE_MAP[cameraAngle]?.[baseProvider] || CAMERA_ANGLE_MAP[cameraAngle]?.veo || 'frontal medium shot'}
 VELOCIDAD DEL HABLA SELECCIONADA POR EL USUARIO: ${SPEECH_RATE_MAP[speechRate] || SPEECH_RATE_MAP.normal}
 
 INSTRUCCIONES DE EXTRACCIÓN:
@@ -288,11 +322,11 @@ REGLA DE ORO — ANTI-ALUCINACIÓN:
 ${subjectCtx}${sceneCtx}
 
 REGLAS DE PERFORMANCE PARA ${prov.label.toUpperCase()}:
-${mediaProvider === 'veo' ? `- El diálogo va como: Audio: "texto del personaje"
+${baseProvider === 'veo' ? `- El diálogo va como: Audio: "texto del personaje"
 - Performance y energía van integrados en la descripción visual del personaje.
 - Formato: prosa fluida describiendo qué hace el personaje MIENTRAS habla.
 - NO uses palabras: SACRED, DO NOT, MUST NOT, FORBIDDEN, NEVER — activan filtro RAI.` : ''}
-${mediaProvider === 'kling' ? `- El diálogo va etiquetado: [Character: principal]: "texto"
+${baseProvider === 'kling' ? `- El diálogo va etiquetado: [Character: principal]: "texto"
 - Performance va como instrucciones de movimiento: "character blinks naturally, hands gesture near chest..."
 - Usa sound: true, lip_sync: true.` : ''}
 
@@ -388,7 +422,7 @@ Tu tarea: convertir una descripción en lenguaje natural a campos cinematográfi
 FÓRMULA DEL PROMPT para ${prov.label}:
 ${prov.formula}
 
-${providerRules[mediaProvider] || providerRules.veo}
+${providerRules[baseProvider] || providerRules.veo}
 
 REGLA DE ORO — ANTI-ALUCINACIÓN:
 - SOLO usa información explícita en la descripción del usuario.
