@@ -770,6 +770,90 @@ app.post('/api/llm/complete', async (req, res) => {
   }
 });
 
+// ── POST /api/byteplus/generate ─────────────────────────────
+// Proxy para BytePlus Ark API (evita CORS del browser).
+// Soporta SeedDance 2.0 (dreamina-seedance-2-0-260128)
+//      y SeedDance 1.5 Pro (seedance-1-5-pro-251215).
+// Body: { body, apiKey }
+//   body   → payload completo para BytePlus: { model, content, parameters }
+//   apiKey → clave Bearer del usuario (resuelta en el cliente desde Supabase/.env)
+// ─────────────────────────────────────────────────────────────
+app.post('/api/byteplus/generate', async (req, res) => {
+  const { body: byteplusBody, apiKey } = req.body;
+
+  if (!apiKey || !byteplusBody) {
+    return res.status(400).json({ error: 'apiKey and body are required' });
+  }
+
+  try {
+    const endpoint = 'https://ark.ap-southeast.bytepluses.com/api/v3/video/generation';
+    console.log(`[byteplus] Starting video generation, model: ${byteplusBody?.model}`);
+
+    const response = await fetch(endpoint, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(byteplusBody),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      console.error('[byteplus] Generate error:', data);
+      return res.status(response.status).json({
+        error: data?.error?.message || data?.message || response.statusText,
+      });
+    }
+
+    console.log(`[byteplus] Task created: ${data?.task_id || data?.id}`);
+    res.json(data);
+
+  } catch (err) {
+    console.error('[byteplus] Generate proxy error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/byteplus/poll ──────────────────────────────────
+// Proxy para polling de una tarea BytePlus.
+// Body: { taskId, apiKey }
+// ─────────────────────────────────────────────────────────────
+app.post('/api/byteplus/poll', async (req, res) => {
+  const { taskId, apiKey } = req.body;
+
+  if (!taskId || !apiKey) {
+    return res.status(400).json({ error: 'taskId and apiKey are required' });
+  }
+
+  try {
+    const endpoint = `https://ark.ap-southeast.bytepluses.com/api/v3/video/generation/${taskId}`;
+
+    const response = await fetch(endpoint, {
+      method:  'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      console.error(`[byteplus] Poll error for task ${taskId}:`, data);
+      return res.status(response.status).json({
+        error: data?.error?.message || data?.message || response.statusText,
+      });
+    }
+
+    res.json(data);
+
+  } catch (err) {
+    console.error('[byteplus] Poll proxy error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Start ────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`[DARU Server] Running on http://localhost:${PORT}`);

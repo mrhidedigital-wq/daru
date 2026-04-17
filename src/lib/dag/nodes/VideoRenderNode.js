@@ -661,8 +661,6 @@ async function generateWithSeedDanceBytePlus({
   const apiKey = await resolveKey('byteplus_api_key', 'REACT_APP_BYTEPLUS_API_KEY');
   if (!apiKey) throw new Error('BytePlus API key no configurada. Agrégala en Ajustes → API Keys.');
 
-  const BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3';
-
   // Construir el array content según el modo de entrada
   const content = [];
 
@@ -701,28 +699,31 @@ async function generateWithSeedDanceBytePlus({
     },
   };
 
-  const res = await fetch(`${BASE}/video/generation`, {
+  // Enrutar a través del proxy backend (evita CORS del browser).
+  // Mismo patrón que generateWithVeo → /api/veo/generate.
+  const serverUrl = process.env.REACT_APP_SERVER_URL || '';
+
+  const res = await fetch(`${serverUrl}/api/byteplus/generate`, {
     method:  'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ body, apiKey }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(`BytePlus SeedDance API error: ${err?.error?.message || err?.message || res.status}`);
+    throw new Error(`BytePlus SeedDance API error: ${err?.error || err?.message || res.status}`);
   }
 
   const data    = await res.json();
   const taskId  = data?.task_id || data?.id;
   if (!taskId) throw new Error('BytePlus SeedDance returned no task ID');
 
-  // Poll task status
+  // Poll task status via proxy
   const { videoUrl } = await pollUntilDone(async () => {
-    const pollRes  = await fetch(`${BASE}/video/generation/${taskId}`, {
-      headers: { 'Authorization': `Bearer ${apiKey}` },
+    const pollRes  = await fetch(`${serverUrl}/api/byteplus/poll`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ taskId, apiKey }),
     });
     const pollData = await pollRes.json();
     const status   = pollData?.status;
