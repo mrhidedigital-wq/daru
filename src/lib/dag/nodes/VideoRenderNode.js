@@ -507,8 +507,7 @@ async function generateWithKling({ prompt, startUrl, endUrl, turnaround, aspectR
   const apiKey = await resolveKey('kling_api_key', 'REACT_APP_KLING_API_KEY');
   if (!apiKey) throw new Error('Kling API key no configurada. Agrégala en Ajustes → API Keys.');
 
-  // Usar Freepik API (más simple) o PiAPI
-  const BASE = 'https://api.freepik.com/v1/ai/video/kling-v3';
+  const serverUrl = process.env.REACT_APP_SERVER_URL || '';
 
   const imageList = [];
   if (startUrl) imageList.push({ type: 'first_frame', url: startUrl });
@@ -524,28 +523,27 @@ async function generateWithKling({ prompt, startUrl, endUrl, turnaround, aspectR
     ...(imageList.length > 0 && { image_list: imageList }),
   };
 
-  const res = await fetch(BASE, {
+  const res = await fetch(`${serverUrl}/api/kling/generate`, {
     method:  'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-freepik-api-key': apiKey,
-    },
-    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ body, apiKey }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(`Kling API error: ${err?.message || res.status}`);
+    throw new Error(`Kling API error: ${err?.error || err?.message || res.status}`);
   }
 
   const { data } = await res.json();
   const taskId   = data?.task_id || data?.id;
   if (!taskId) throw new Error('Kling returned no task ID');
 
-  // Poll task status
+  // Poll via proxy
   const { videoUrl } = await pollUntilDone(async () => {
-    const pollRes  = await fetch(`${BASE}/${taskId}`, {
-      headers: { 'x-freepik-api-key': apiKey },
+    const pollRes  = await fetch(`${serverUrl}/api/kling/poll`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ taskId, apiKey }),
     });
     const pollData = await pollRes.json();
     const status   = pollData?.data?.status || pollData?.status;
@@ -571,7 +569,7 @@ async function generateWithSeedDance({ prompt, startUrl, endUrl, turnaround, mot
   const apiKey = await resolveKey('seeddance_api_key', 'REACT_APP_SEEDDANCE_API_KEY');
   if (!apiKey) throw new Error('SeedDance API key no configurada. Agrégala en Ajustes → API Keys.');
 
-  const BASE = 'https://api.aimlapi.com/v2/video/generations';
+  const serverUrl = process.env.REACT_APP_SERVER_URL || '';
 
   let body;
 
@@ -588,45 +586,38 @@ async function generateWithSeedDance({ prompt, startUrl, endUrl, turnaround, mot
       duration:     Math.min(Math.max(durationSeconds || 5, 4), 15),
     };
   } else {
-    // First frame / First+Last frame mode
-    // AIMLAPI v2 usa 'image_files' (array de URLs), NO 'filePaths'
     const imageFiles = [startUrl, endUrl].filter(Boolean);
-
-    // functionMode correcto según cuántos frames hay disponibles
-    // Bug fix: el ternario anterior tenía 'first_last_frames' en AMBAS ramas
     const functionMode = imageFiles.length === 2 ? 'first_last_frames' : 'first_frame';
-
     body = {
       model:        'bytedance/seedance-1-5-pro',
       prompt,
       functionMode,
-      image_files:  imageFiles,   // campo correcto de la API AIMLAPI v2
+      image_files:  imageFiles,
       ratio:        aspectRatio === '9:16' ? '9:16' : aspectRatio === '1:1' ? '1:1' : '16:9',
       duration:     Math.min(Math.max(durationSeconds || 5, 4), 15),
     };
   }
 
-  const res = await fetch(BASE, {
+  const res = await fetch(`${serverUrl}/api/aimlapi/generate`, {
     method:  'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ body, apiKey }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(`SeedDance API error: ${err?.error?.message || res.status}`);
+    throw new Error(`SeedDance API error: ${err?.error || err?.message || res.status}`);
   }
 
   const { id: generationId } = await res.json();
   if (!generationId) throw new Error('SeedDance returned no generation ID');
 
-  // Poll status
+  // Poll via proxy
   const { videoUrl } = await pollUntilDone(async () => {
-    const pollRes  = await fetch(`${BASE}?generation_id=${generationId}`, {
-      headers: { 'Authorization': `Bearer ${apiKey}` },
+    const pollRes  = await fetch(`${serverUrl}/api/aimlapi/poll`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ generationId, apiKey }),
     });
     const pollData = await pollRes.json();
     const status   = pollData?.status;
@@ -640,7 +631,7 @@ async function generateWithSeedDance({ prompt, startUrl, endUrl, turnaround, mot
       throw new Error(`SeedDance failed: ${pollData?.error?.message || 'Unknown error'}`);
     }
     return { done: false };
-  }, 10000, 48); // 10s intervals, max 8 min
+  }, 10000, 48);
 
   return videoUrl;
 }
@@ -752,8 +743,8 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
   const apiKey = await resolveKey('piapi_api_key', 'REACT_APP_PIAPI_API_KEY');
   if (!apiKey) throw new Error('PiAPI key no configurada. Agrégala en Ajustes → API Keys.');
 
-  const BASE     = 'https://api.piapi.ai/api/v1/task';
-  const taskType = piapiModel === 'fast' ? 'seedance-2-fast' : 'seedance-2';
+  const serverUrl = process.env.REACT_APP_SERVER_URL || '';
+  const taskType  = piapiModel === 'fast' ? 'seedance-2-fast' : 'seedance-2';
 
   // Construir input según modo
   let mode;
@@ -763,7 +754,6 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
   };
 
   if (motionRef) {
-    // Omni reference: @image1 y @video1 en el prompt
     mode = 'omni_reference';
     const turnaroundUrls = Object.values(turnaround || {}).filter(Boolean);
     if (turnaroundUrls.length > 0) {
@@ -774,50 +764,45 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
     }
     input.video1 = motionRef;
   } else if (startUrl && endUrl) {
-    // First + Last frame
     mode = 'first_last_frames';
     input.prompt            = prompt;
     input.first_frame_image = startUrl;
     input.last_frame_image  = endUrl;
   } else if (startUrl) {
-    // Solo first frame — PiAPI acepta first_last_frames con solo first_frame_image
     mode = 'first_last_frames';
     input.prompt            = prompt;
     input.first_frame_image = startUrl;
   } else {
-    // Solo texto
     mode = 'text_to_video';
     input.prompt = prompt;
   }
 
   input.mode = mode;
 
-  const res = await fetch(BASE, {
+  const res = await fetch(`${serverUrl}/api/piapi/generate`, {
     method:  'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key':    apiKey,
-    },
-    body: JSON.stringify({
-      model:     'Qingying',
-      task_type: taskType,
-      input,
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({
+      body: { model: 'Qingying', task_type: taskType, input },
+      apiKey,
     }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(`PiAPI SeedDance error: ${err?.message || err?.error?.message || res.status}`);
+    throw new Error(`PiAPI SeedDance error: ${err?.error || err?.message || res.status}`);
   }
 
   const data   = await res.json();
   const taskId = data?.data?.task_id || data?.task_id;
   if (!taskId) throw new Error('PiAPI returned no task ID');
 
-  // Poll task status
+  // Poll via proxy
   const { videoUrl } = await pollUntilDone(async () => {
-    const pollRes  = await fetch(`${BASE}/${taskId}`, {
-      headers: { 'X-API-Key': apiKey },
+    const pollRes  = await fetch(`${serverUrl}/api/piapi/poll`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ taskId, apiKey }),
     });
     const pollData = await pollRes.json();
     const status   = pollData?.data?.status || pollData?.status;
@@ -836,28 +821,26 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
 
   // Encadenar remove-watermark si el usuario lo activó
   if (removeWatermark) {
-    return _removePiAPIWatermark(apiKey, taskId, videoUrl);
+    return _removePiAPIWatermark(apiKey, taskId, videoUrl, serverUrl);
   }
 
   return videoUrl;
 }
 
-// Helper: quita el watermark de un video de PiAPI vía task "remove-watermark"
+// Helper: quita el watermark de un video de PiAPI vía task "remove-watermark".
 // Si el task falla devuelve el video original sin lanzar error — no bloquea la entrega.
-async function _removePiAPIWatermark(apiKey, sourceTaskId, fallbackUrl) {
-  const BASE = 'https://api.piapi.ai/api/v1/task';
-
+async function _removePiAPIWatermark(apiKey, sourceTaskId, fallbackUrl, serverUrl = '') {
   try {
-    const res = await fetch(BASE, {
+    const res = await fetch(`${serverUrl}/api/piapi/generate`, {
       method:  'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key':    apiKey,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model:     'Qingying',
-        task_type: 'remove-watermark',
-        input:     { task_id: sourceTaskId },
+        body: {
+          model:     'Qingying',
+          task_type: 'remove-watermark',
+          input:     { task_id: sourceTaskId },
+        },
+        apiKey,
       }),
     });
 
@@ -871,8 +854,10 @@ async function _removePiAPIWatermark(apiKey, sourceTaskId, fallbackUrl) {
     if (!wmTask) return fallbackUrl;
 
     const { videoUrl } = await pollUntilDone(async () => {
-      const pollRes  = await fetch(`${BASE}/${wmTask}`, {
-        headers: { 'X-API-Key': apiKey },
+      const pollRes  = await fetch(`${serverUrl}/api/piapi/poll`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ taskId: wmTask, apiKey }),
       });
       const pollData = await pollRes.json();
       const status   = pollData?.data?.status || pollData?.status;

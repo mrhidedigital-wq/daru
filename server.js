@@ -770,6 +770,130 @@ app.post('/api/llm/complete', async (req, res) => {
   }
 });
 
+// ── POST /api/kling/generate ────────────────────────────────
+// Proxy para Freepik Kling API (evita CORS del browser).
+// Body: { body, apiKey }
+// ─────────────────────────────────────────────────────────────
+app.post('/api/kling/generate', async (req, res) => {
+  const { body: klingBody, apiKey } = req.body;
+  if (!apiKey || !klingBody) return res.status(400).json({ error: 'apiKey and body are required' });
+
+  try {
+    const endpoint = 'https://api.freepik.com/v1/ai/video/kling-v3';
+    const response = await fetch(endpoint, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'x-freepik-api-key': apiKey },
+      body:    JSON.stringify(klingBody),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(response.status).json({ error: data?.message || response.statusText });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/kling/poll ─────────────────────────────────────
+// Body: { taskId, apiKey }
+// ─────────────────────────────────────────────────────────────
+app.post('/api/kling/poll', async (req, res) => {
+  const { taskId, apiKey } = req.body;
+  if (!taskId || !apiKey) return res.status(400).json({ error: 'taskId and apiKey are required' });
+
+  try {
+    const endpoint = `https://api.freepik.com/v1/ai/video/kling-v3/${taskId}`;
+    const response = await fetch(endpoint, { headers: { 'x-freepik-api-key': apiKey } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(response.status).json({ error: data?.message || response.statusText });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/aimlapi/generate ───────────────────────────────
+// Proxy para AIMLAPI SeedDance (evita CORS del browser).
+// Body: { body, apiKey }
+// ─────────────────────────────────────────────────────────────
+app.post('/api/aimlapi/generate', async (req, res) => {
+  const { body: aimlBody, apiKey } = req.body;
+  if (!apiKey || !aimlBody) return res.status(400).json({ error: 'apiKey and body are required' });
+
+  try {
+    const endpoint = 'https://api.aimlapi.com/v2/video/generations';
+    const response = await fetch(endpoint, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body:    JSON.stringify(aimlBody),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || response.statusText });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/aimlapi/poll ───────────────────────────────────
+// Body: { generationId, apiKey }
+// ─────────────────────────────────────────────────────────────
+app.post('/api/aimlapi/poll', async (req, res) => {
+  const { generationId, apiKey } = req.body;
+  if (!generationId || !apiKey) return res.status(400).json({ error: 'generationId and apiKey are required' });
+
+  try {
+    const endpoint = `https://api.aimlapi.com/v2/video/generations?generation_id=${generationId}`;
+    const response = await fetch(endpoint, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || response.statusText });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/piapi/generate ─────────────────────────────────
+// Proxy para PiAPI SeedDance (evita CORS del browser).
+// Usado también para remove-watermark (mismo endpoint, distinto body).
+// Body: { body, apiKey }
+// ─────────────────────────────────────────────────────────────
+app.post('/api/piapi/generate', async (req, res) => {
+  const { body: piapiBody, apiKey } = req.body;
+  if (!apiKey || !piapiBody) return res.status(400).json({ error: 'apiKey and body are required' });
+
+  try {
+    const endpoint = 'https://api.piapi.ai/api/v1/task';
+    const response = await fetch(endpoint, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body:    JSON.stringify(piapiBody),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(response.status).json({ error: data?.message || data?.error?.message || response.statusText });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/piapi/poll ─────────────────────────────────────
+// Body: { taskId, apiKey }
+// ─────────────────────────────────────────────────────────────
+app.post('/api/piapi/poll', async (req, res) => {
+  const { taskId, apiKey } = req.body;
+  if (!taskId || !apiKey) return res.status(400).json({ error: 'taskId and apiKey are required' });
+
+  try {
+    const endpoint = `https://api.piapi.ai/api/v1/task/${taskId}`;
+    const response = await fetch(endpoint, { headers: { 'X-API-Key': apiKey } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(response.status).json({ error: data?.message || response.statusText });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /api/byteplus/generate ─────────────────────────────
 // Proxy para BytePlus Ark API (evita CORS del browser).
 // Soporta SeedDance 2.0 (dreamina-seedance-2-0-260128)
@@ -786,7 +910,7 @@ app.post('/api/byteplus/generate', async (req, res) => {
   }
 
   try {
-    const endpoint = 'https://ark.ap-southeast.bytepluses.com/api/v3/video/generation';
+    const endpoint = 'https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks';
     console.log(`[byteplus] Starting video generation, model: ${byteplusBody?.model}`);
 
     const response = await fetch(endpoint, {
@@ -828,7 +952,7 @@ app.post('/api/byteplus/poll', async (req, res) => {
   }
 
   try {
-    const endpoint = `https://ark.ap-southeast.bytepluses.com/api/v3/video/generation/${taskId}`;
+    const endpoint = `https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks/${taskId}`;
 
     const response = await fetch(endpoint, {
       method:  'GET',
