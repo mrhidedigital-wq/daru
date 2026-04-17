@@ -290,6 +290,7 @@ export class DAGExecutor {
         handMovement:    this.context.cameraAngle === 'frontal' ? 'restrained' : 'off',
         blinkingEnabled: this.context.shotMode === 'talking_head',
         cameraAngle:     this.context.cameraAngle || 'frontal',
+        sameScene:       this.context.sameScene   ?? false,
       },
     });
 
@@ -317,6 +318,7 @@ export class DAGExecutor {
         handMovement:    this.context.cameraAngle === 'frontal' ? 'restrained' : 'off',
         blinkingEnabled: this.context.shotMode === 'talking_head',
         cameraAngle:     this.context.cameraAngle || 'frontal',
+        sameScene:       this.context.sameScene   ?? false,
       },
     });
 
@@ -672,6 +674,7 @@ export async function buildAndExecuteDAG(shot, options = {}) {
       isManualPrompt:  true,                            // impide que VideoRenderNode modifique el prompt
       removeWatermark: options.frames.removeWatermark   ?? false,
       piapiModel:      options.frames.piapiModel        || 'pro',
+      sameScene:       options.frames.sameScene         ?? false,
       // ── Performance del personaje ─────────────────────────
       shotMode:        options.shotMode    || 'cinematic',
       speechRate:      options.speechRate  || 'normal',
@@ -702,6 +705,7 @@ export async function buildAndExecuteDAG(shot, options = {}) {
       shotMode:        options.shotMode    || 'cinematic',
       speechRate:      options.speechRate  || 'normal',
       cameraAngle:     options.cameraAngle || 'frontal',
+      sameScene:       options.frames?.sameScene ?? false,
     },
     onProgress:   options.onProgress,
     onNodeUpdate: options.onNodeUpdate,
@@ -739,6 +743,7 @@ export async function buildAndExecuteDAG(shot, options = {}) {
       durationSeconds: shot.duration_seconds            || 8,
       removeWatermark: options.frames.removeWatermark   ?? false,
       piapiModel:      options.frames.piapiModel        || 'pro',
+      sameScene:       options.frames.sameScene         ?? false,
     };
   }
 

@@ -167,6 +167,8 @@ export class PromptBuilderNode extends CinematicNode {
         speechRate:            config.parameters?.speechRate            || 'normal',   // 'veloz' | 'rapido' | 'normal' | 'lento' | 'con_pausas'
         blinkingEnabled:       config.parameters?.blinkingEnabled       !== false,     // true por defecto en talking_head
         handMovement:          config.parameters?.handMovement          || 'off',      // 'off' | 'restrained' | 'expressive'
+        // ── sameScene: ambos frames son vistas de la misma toma ──
+        sameScene:             config.parameters?.sameScene             ?? false,
         ...config.parameters,
       },
     });
@@ -382,11 +384,19 @@ Do not alter the subject's face, body proportions, species, clothing structure, 
       blocks.push(performanceBlock);
     }
 
-    blocks.push(`CONTINUITY_RULES:
+    if (this.parameters.sameScene) {
+      blocks.push(`CONTINUITY_RULES:
+- Keep the same subject identity, wardrobe, and scene logic across the shot.
+- Do not introduce new visual elements not present in the inputs.
+- SAME SCENE MODE: Both reference frames are from the SAME continuous scene. Maintain identical scene elements, characters, props, lighting and atmosphere throughout. The camera or subject moves between these two perspectives — nothing in the scene itself changes.
+- The result must feel like one continuous take, not two different shots.`);
+    } else {
+      blocks.push(`CONTINUITY_RULES:
 - Keep the same subject identity, wardrobe, and scene logic across the shot.
 - Do not introduce new visual elements not present in the inputs.
 - If both start and end framings are present, change composition progressively while preserving continuity.
 - The result must feel like one coherent shot, not two unrelated images.`);
+    }
 
     return blocks.join('\n\n');
   }

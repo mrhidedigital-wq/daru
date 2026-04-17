@@ -783,21 +783,23 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
     mode = 'omni_reference';
     const turnaroundUrls = Object.values(turnaround || {}).filter(Boolean);
     if (turnaroundUrls.length > 0) {
-      input.prompt = `@image1 ${prompt}. Follow @video1 camera movement and style.`;
-      input.image1 = turnaroundUrls[0];
+      input.prompt      = `@image_file_1 ${prompt}. Follow @video_file_1 camera movement and style.`;
+      input.image_urls  = turnaroundUrls.slice(0, 1);
     } else {
-      input.prompt = `${prompt}. Follow @video1 camera movement and style.`;
+      input.prompt      = `${prompt}. Follow @video_file_1 camera movement and style.`;
+      input.image_urls  = [];
     }
-    input.video1 = motionRef;
+    input.video_urls = [motionRef];
   } else if (startUrl && endUrl) {
     mode = 'first_last_frames';
-    input.prompt            = prompt;
-    input.first_frame_image = startUrl;
-    input.last_frame_image  = endUrl;
+    input.prompt       = `Starting from @image_file_1, transition smoothly to @image_file_2. ${prompt}`;
+    input.image_urls   = [startUrl, endUrl];
+    input.aspect_ratio = 'auto';
   } else if (startUrl) {
     mode = 'first_last_frames';
-    input.prompt            = prompt;
-    input.first_frame_image = startUrl;
+    input.prompt       = `Starting from @image_file_1. ${prompt}`;
+    input.image_urls   = [startUrl];
+    input.aspect_ratio = 'auto';
   } else {
     mode = 'text_to_video';
     input.prompt = prompt;
@@ -810,7 +812,7 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({
       action: 'generate',
-      body: { model: 'Qingying', task_type: taskType, input },
+      body: { model: 'seedance', task_type: taskType, input },
       apiKey,
     }),
   });
@@ -834,9 +836,9 @@ async function generateWithSeedDancePiAPI({ prompt, startUrl, endUrl, turnaround
     const pollData = await pollRes.json();
     const status   = pollData?.data?.status || pollData?.status;
 
-    if (status === 'completed' || status === 'succeed') {
-      const url = pollData?.data?.output?.video_url
-               || pollData?.output?.video_url;
+    if (status === 'completed') {
+      const url = pollData?.data?.output?.video
+               || pollData?.output?.video;
       if (!url) throw new Error('PiAPI returned no video URL');
       return { done: true, videoUrl: url };
     }
@@ -864,7 +866,7 @@ async function _removePiAPIWatermark(apiKey, sourceTaskId, fallbackUrl, serverUr
       body: JSON.stringify({
         action: 'generate',
         body: {
-          model:     'Qingying',
+          model:     'seedance',
           task_type: 'remove-watermark',
           input:     { task_id: sourceTaskId },
         },
@@ -890,8 +892,8 @@ async function _removePiAPIWatermark(apiKey, sourceTaskId, fallbackUrl, serverUr
       const pollData = await pollRes.json();
       const status   = pollData?.data?.status || pollData?.status;
 
-      if (status === 'completed' || status === 'succeed') {
-        const url = pollData?.data?.output?.video_url || pollData?.output?.video_url;
+      if (status === 'completed') {
+        const url = pollData?.data?.output?.video || pollData?.output?.video;
         return { done: true, videoUrl: url || fallbackUrl };
       }
       if (status === 'failed' || status === 'error') {
@@ -937,6 +939,8 @@ export class VideoRenderNode extends CinematicNode {
     // Para AIMLAPI seeddance, se ignora silenciosamente
     this.removeWatermark = config.removeWatermark ?? p.removeWatermark ?? false;
     this.piapiModel      = config.piapiModel      || p.piapiModel      || 'pro';
+    // sameScene: ambos frames son vistas distintas de la misma toma continua
+    this.sameScene       = config.sameScene       ?? p.sameScene       ?? false;
   }
 
   // canExecute siempre true — no depende de otros nodos del DAG
@@ -978,8 +982,24 @@ export class VideoRenderNode extends CinematicNode {
       finalPrompt = `${this.action.trim()}. ${finalPrompt}`;
     }
 
-    if (this.frameMode === 'exact') {
-      finalPrompt += ' CRITICAL: Maintain the exact visual appearance, colors, composition, and details of the provided first and last frames. Do not alter, replace, or hallucinate any element that appears in those frames. The video must start exactly as the first frame and end exactly as the last frame.';
+    // ── Anti-hallucination anchor — diferenciado por combinación de frames y modo
+    const hasStart = !!this.startUrl;
+    const hasEnd   = !!this.endUrl;
+    const isPiAPI  = this.mediaProvider === PROVIDERS.seeddance_piapi;
+
+    if (hasStart && !hasEnd) {
+      // Solo first frame — anclar al frame de inicio
+      finalPrompt += ' CRITICAL: The video must start exactly as shown in the reference image. Maintain all visual elements, characters, colors and scene composition from that first frame throughout the entire video.';
+    } else if (hasStart && hasEnd && this.sameScene) {
+      // Ambos frames son la MISMA escena continua — ningún elemento puede cambiar
+      finalPrompt += ' CRITICAL: Both reference frames belong to the SAME continuous scene. The video shows the camera or subject moving between these two perspectives. All scene elements, characters, props, lighting and atmosphere must remain 100% consistent throughout. Do not invent or add any element not visible in the reference frames.';
+    } else if (hasStart && hasEnd && !this.sameScene) {
+      // Frames distintos — anclar inicio y fin con sintaxis correcta por provider
+      if (isPiAPI) {
+        finalPrompt += ' CRITICAL: The video must start exactly as shown in @image_file_1 and end exactly as shown in @image_file_2. Do not alter, replace or hallucinate any element present in those frames.';
+      } else {
+        finalPrompt += ' CRITICAL: The video must start exactly as shown in the first reference frame and end exactly as shown in the last reference frame. Do not alter, replace or hallucinate any element present in those frames.';
+      }
     }
 
     // Recopilar imágenes de personajes — PRINCIPAL primero, luego secundarios
