@@ -90,8 +90,10 @@ Respond ONLY in this JSON format, nothing else:
 
     // Llamar a Gemini con las dos imágenes
     const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-    const endpoint = `${serverUrl}/api/gemini/proxy/gemini-2.5-flash`;
+    const endpoint = `${serverUrl}/api/llm`;
     const body = {
+      action: 'gemini-proxy',
+      model: 'gemini-2.5-flash',
       contents: [{
         parts: [
           { text: prompt },

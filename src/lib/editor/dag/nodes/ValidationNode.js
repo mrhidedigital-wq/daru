@@ -120,7 +120,7 @@ export class ValidationNode extends EditorNode {
   async _visualValidation(originalUrl, editResult, intentResult, preservationResult, composerResult) {
     try {
       const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-      const endpoint = `${serverUrl}/api/gemini/proxy/gemini-2.5-flash`;
+      const endpoint = `${serverUrl}/api/llm`;
 
       // Convertir ambas imágenes a base64
       const originalBase64 = await this.imageToBase64(originalUrl);
@@ -132,6 +132,8 @@ export class ValidationNode extends EditorNode {
       const preservation = preservationResult || {};
 
       const body = {
+        action: 'gemini-proxy',
+        model: 'gemini-2.5-flash',
         contents: [{
           parts: [
             {

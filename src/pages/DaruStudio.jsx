@@ -481,10 +481,10 @@ const template = newShotTemplate(maxShotNumber);
 
     try {
       const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-      const res = await fetch(`${serverUrl}/api/export`, {
+      const res = await fetch(`${serverUrl}/api/media`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ projectId, userId: user?.id }),
+        body:    JSON.stringify({ action: 'export', projectId, userId: user?.id }),
       });
 
       if (!res.ok) {

@@ -123,10 +123,11 @@ export default function CinematicImagePanel() {
     setGenError(null);
 
     try {
-      const res = await fetch('/api/gemini/proxy', {
+      const res = await fetch('/api/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'gemini-proxy',
           model: 'gemini-2.5-flash',
           contents: [{ role: 'user', parts: [{ text: userIdea }] }],
           systemInstruction: { parts: [{ text: IMPROVE_SYSTEM }] },
@@ -173,10 +174,11 @@ export default function CinematicImagePanel() {
 
       const fullPrompt = `${prompt} ${arNote}`;
 
-      const res = await fetch('/api/gemini/proxy', {
+      const res = await fetch('/api/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'gemini-proxy',
           model: 'gemini-2.5-flash-image',
           contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
           generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
@@ -227,10 +229,11 @@ export default function CinematicImagePanel() {
       const originalPrompt = improvedPrompt.trim() || userIdea.trim();
       const editPrompt = `Take this exact scene and character, change ONLY the shot type to ${planoFinal} with ${anguloFinal}. Keep identical: lighting, character appearance, clothing, location, color palette. Same moment, different framing.`;
 
-      const res = await fetch('/api/gemini/proxy', {
+      const res = await fetch('/api/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'gemini-proxy',
           model: 'gemini-2.5-flash-image',
           contents: [
               // Turno 1 usuario: lo que generó el frame inicial

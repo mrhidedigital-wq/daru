@@ -23,9 +23,10 @@ async function generateImageWithGemini(prompt, aspectRatio = '16:9') {
 // Usar Gemini 2.5 Flash Image
 async function generateImageFallback(prompt, aspectRatio) {
   const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-  const endpoint = `${serverUrl}/api/gemini/proxy`;
+  const endpoint = `${serverUrl}/api/llm`;
 
   const body = {
+    action: 'gemini-proxy',
     model: 'gemini-2.5-flash-image',
     contents: [{ parts: [{ text: `Generate a single cinematic frame: ${prompt}` }] }],
     generationConfig: {

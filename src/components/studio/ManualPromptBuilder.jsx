@@ -232,11 +232,13 @@ function parseJSON(text) {
 async function geminiCall(model, systemPrompt, userParts, genConfig) {
   const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
   const res = await fetch(
-    `${serverUrl}/api/gemini/proxy/${model}`,
+    `${serverUrl}/api/llm`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        action:            'gemini-proxy',
+        model,
         contents:          [{ role: 'user', parts: userParts }],
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig:  genConfig,

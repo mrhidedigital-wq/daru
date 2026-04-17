@@ -64,8 +64,8 @@ import { urlToInlineData } from './assetUtils';
 const GEMINI_TEXT_MODEL  = 'gemini-2.5-flash';
 const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
 
-function geminiTextEndpoint()  { return '/api/gemini/proxy'; }
-function geminiImageEndpoint() { return '/api/gemini/proxy'; }
+function geminiTextEndpoint()  { return '/api/llm'; }
+function geminiImageEndpoint() { return '/api/llm'; }
 
 // ─── System prompt del PASO 1 — Grounding ────────────────────────────────────
 const GROUNDING_SYSTEM = `You are a visual reference analyst for a cinematic AI frame generation system.
@@ -337,6 +337,7 @@ Be exhaustive — especially on clothing colors and background elements.`,
     ];
 
     const body = {
+      action: 'gemini-proxy',
       model: GEMINI_TEXT_MODEL,
       contents: [{ role: 'user', parts }],
       systemInstruction: { parts: [{ text: GROUNDING_SYSTEM }] },
@@ -494,6 +495,7 @@ Be exhaustive — especially on clothing colors and background elements.`,
     ];
 
     const body = {
+      action: 'gemini-proxy',
       model: GEMINI_IMAGE_MODEL,
       contents: [{ role: 'user', parts }],
       generationConfig: {
@@ -539,6 +541,7 @@ Be exhaustive — especially on clothing colors and background elements.`,
     ];
 
     const body = {
+      action: 'gemini-proxy',
       model: GEMINI_TEXT_MODEL,
       contents: [{ role: 'user', parts }],
       systemInstruction: { parts: [{ text: VALIDATION_SYSTEM }] },

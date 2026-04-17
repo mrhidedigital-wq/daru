@@ -163,7 +163,7 @@ export async function urlToInlineData(url) {
 // aspectRatio: '16:9' | '9:16'
 // ============================================================
 export async function generateImageWithGemini(prompt, refImages = [], aspectRatio = '16:9') {
-  const endpoint = '/api/gemini/proxy';
+  const endpoint = '/api/llm';
 
   // ── Orden: imágenes primero, texto al final (Google docs) ─────
   const userParts = [];
@@ -176,6 +176,7 @@ export async function generateImageWithGemini(prompt, refImages = [], aspectRati
   userParts.push({ text: prompt });
 
   const body = {
+    action: 'gemini-proxy',
     contents: [{ role: 'user', parts: userParts }],
     generationConfig: {
       responseModalities: ['IMAGE', 'TEXT'],
@@ -212,13 +213,14 @@ export async function generateImageWithGemini(prompt, refImages = [], aspectRati
 //   Turn 1 model: [imagen frontal]
 //   Turn 2 user:  "cambia el ángulo a lateral derecho"  ← Gemini edita
 export async function generateImageWithConversation(frontalPrompt, frontalImage, editPrompt, aspectRatio = '16:9') {
-  const endpoint = '/api/gemini/proxy';
+  const endpoint = '/api/llm';
 
   // Convertir la imagen frontal a inline data
   const frontalInline = await urlToInlineData(frontalImage);
   if (!frontalInline) throw new Error('No se pudo leer la imagen frontal');
 
   const body = {
+    action: 'gemini-proxy',
     contents: [
       // Turno 1: usuario pidió la escena frontal
       {
@@ -738,7 +740,7 @@ export async function generateSceneViewWithRef(scene, angleKey, frontalUrl = nul
 // Llama a Gemini TEXT con la frontal como inline data.
 // Devuelve array de assets con posición espacial.
 export async function analyzeSceneFrontal(frontalImageUrl) {
-  const endpoint = '/api/gemini/proxy';
+  const endpoint = '/api/llm';
 
   const inline = await urlToInlineData(frontalImageUrl);
   if (!inline) return [];
@@ -758,6 +760,7 @@ Return ONLY a valid JSON array. No explanation, no markdown fences, no extra tex
 Example: [{"name":"kitchen island","material":"dark concrete top","position_lr":"center","position_depth":"midground","notes":"2 stools on left side"}]`;
 
   const body = {
+    action: 'gemini-proxy',
     model: 'gemini-2.5-flash',
     contents: [{
       role: 'user',

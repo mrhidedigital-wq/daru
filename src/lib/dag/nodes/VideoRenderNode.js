@@ -159,10 +159,10 @@ async function extendWithVeo({ videoUrl, gcsUri, prompt, aspectRatio, targetSeco
       },
     };
 
-    const extendRes = await fetch(`${serverUrl}/api/veo/extend`, {
+    const extendRes = await fetch(`${serverUrl}/api/veo`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ body, projectId, accessToken: vertexToken }),
+      body:    JSON.stringify({ action: 'extend', body, projectId, accessToken: vertexToken }),
     });
 
     if (!extendRes.ok) {
@@ -174,10 +174,10 @@ async function extendWithVeo({ videoUrl, gcsUri, prompt, aspectRatio, targetSeco
     const opName    = operation.name;
 
     const result = await pollUntilDone(async () => {
-      const pollRes  = await fetch(`${serverUrl}/api/veo/poll`, {
+      const pollRes  = await fetch(`${serverUrl}/api/veo`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ operationName: opName, accessToken: vertexToken }),
+        body:    JSON.stringify({ action: 'poll', operationName: opName, accessToken: vertexToken }),
       });
       const pollData = await pollRes.json();
 
@@ -202,10 +202,11 @@ async function extendWithVeo({ videoUrl, gcsUri, prompt, aspectRatio, targetSeco
 
   // Trim final al targetSeconds exacto via /api/video/finalize
   console.log(`[veo-extend] Trimming a ${targetSeconds}s exactos`);
-  const finalizeRes = await fetch(`${serverUrl}/api/video/finalize`, {
+  const finalizeRes = await fetch(`${serverUrl}/api/media`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({
+      action:                'finalize',
       gcsUri:                currentGcsUri   || null,
       videoUrl:              currentVideoUrl || null,
       accessToken:           vertexToken,
@@ -384,10 +385,11 @@ async function generateWithVeo({ prompt, startUrl, endUrl, turnaround, aspectRat
 
   if (useVertex) {
     // ── Modo Vertex AI via proxy backend (evita CORS) ──
-    const generateRes = await fetch(`${serverUrl}/api/veo/generate`, {
+    const generateRes = await fetch(`${serverUrl}/api/veo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        action: 'generate',
         body: body,
         projectId,
         accessToken: vertexToken,
@@ -404,10 +406,11 @@ async function generateWithVeo({ prompt, startUrl, endUrl, turnaround, aspectRat
 
     // Poll via proxy backend
     const { videoUrl } = await pollUntilDone(async () => {
-      const pollRes  = await fetch(`${serverUrl}/api/veo/poll`, {
+      const pollRes  = await fetch(`${serverUrl}/api/veo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'poll',
           operationName: opName,
           accessToken: vertexToken,
         }),
@@ -523,10 +526,10 @@ async function generateWithKling({ prompt, startUrl, endUrl, turnaround, aspectR
     ...(imageList.length > 0 && { image_list: imageList }),
   };
 
-  const res = await fetch(`${serverUrl}/api/kling/generate`, {
+  const res = await fetch(`${serverUrl}/api/kling`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ body, apiKey }),
+    body:    JSON.stringify({ action: 'generate', body, apiKey }),
   });
 
   if (!res.ok) {
@@ -540,10 +543,10 @@ async function generateWithKling({ prompt, startUrl, endUrl, turnaround, aspectR
 
   // Poll via proxy
   const { videoUrl } = await pollUntilDone(async () => {
-    const pollRes  = await fetch(`${serverUrl}/api/kling/poll`, {
+    const pollRes  = await fetch(`${serverUrl}/api/kling`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ taskId, apiKey }),
+      body:    JSON.stringify({ action: 'poll', taskId, apiKey }),
     });
     const pollData = await pollRes.json();
     const status   = pollData?.data?.status || pollData?.status;
@@ -598,10 +601,10 @@ async function generateWithSeedDance({ prompt, startUrl, endUrl, turnaround, mot
     };
   }
 
-  const res = await fetch(`${serverUrl}/api/aimlapi/generate`, {
+  const res = await fetch(`${serverUrl}/api/aimlapi`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ body, apiKey }),
+    body:    JSON.stringify({ action: 'generate', body, apiKey }),
   });
 
   if (!res.ok) {
@@ -614,10 +617,10 @@ async function generateWithSeedDance({ prompt, startUrl, endUrl, turnaround, mot
 
   // Poll via proxy
   const { videoUrl } = await pollUntilDone(async () => {
-    const pollRes  = await fetch(`${serverUrl}/api/aimlapi/poll`, {
+    const pollRes  = await fetch(`${serverUrl}/api/aimlapi`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ generationId, apiKey }),
+      body:    JSON.stringify({ action: 'poll', generationId, apiKey }),
     });
     const pollData = await pollRes.json();
     const status   = pollData?.status;
@@ -721,10 +724,10 @@ async function generateWithSeedDanceBytePlus({
   // Mismo patrón que generateWithVeo → /api/veo/generate.
   const serverUrl = process.env.REACT_APP_SERVER_URL || '';
 
-  const res = await fetch(`${serverUrl}/api/byteplus/generate`, {
+  const res = await fetch(`${serverUrl}/api/byteplus`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ body, apiKey }),
+    body:    JSON.stringify({ action: 'generate', body, apiKey }),
   });
 
   if (!res.ok) {

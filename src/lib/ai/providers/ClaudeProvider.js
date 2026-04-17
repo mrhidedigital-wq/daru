@@ -21,10 +21,11 @@ export class ClaudeProvider extends BaseLLMProvider {
   async complete({ system, prompt, temperature, max_tokens } = {}) {
     const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
 
-    const response = await fetch(`${serverUrl}/api/llm/complete`, {
+    const response = await fetch(`${serverUrl}/api/llm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        action: 'complete',
         provider: 'claude',
         model: this.modelId,
         system,

@@ -65,7 +65,7 @@ export class ExecutionNode extends EditorNode {
   // ============================================================
 
   async _executeGeminiEdit(prompt, mediaUrl, elements = [], mask, editMode = 'faithful', aspectRatio = '16:9') {
-    const endpoint = '/api/gemini/proxy';
+    const endpoint = '/api/llm';
 
     // Construir partes del mensaje
     const parts = [];
@@ -125,6 +125,7 @@ export class ExecutionNode extends EditorNode {
     });
 
     const body = {
+      action: 'gemini-proxy',
       model: 'gemini-2.5-flash-image',
       contents: [{ parts }],
       generationConfig: {
@@ -183,7 +184,7 @@ export class ExecutionNode extends EditorNode {
   async _executeImagenInpaint(prompt, mediaUrl, mask) {
     // El endpoint de Imagen usa :predict — el proxy principal no lo soporta,
     // si falla cae automáticamente al fallback _executeGeminiEdit (línea 227)
-    const endpoint = '/api/imagen/inpaint';
+    const endpoint = '/api/llm';
 
     const imageBase64 = await this.imageToBase64(mediaUrl);
 

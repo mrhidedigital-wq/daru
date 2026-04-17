@@ -444,11 +444,10 @@ const syncElementsToFashionRefs = useCallback(() => {
         : maskData;
 
       const serverUrl = process.env.REACT_APP_SERVER_URL || '';
-      const res = await fetch(`${serverUrl}/api/imagen/inpaint`, {
+      const res = await fetch(`${serverUrl}/api/llm`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        // projectId y accessToken en el body — igual que /api/veo/generate
-        body:    JSON.stringify({ imageBase64, maskBase64, projectId, accessToken }),
+        body:    JSON.stringify({ action: 'imagen-inpaint', imageBase64, maskBase64, projectId, accessToken }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -665,12 +664,14 @@ Mejora y detalla el prompt del usuario para que una IA de edición de imágenes 
 
 Responde SOLO con el prompt mejorado. Sin explicaciones, sin markdown.` });
 
-      const endpoint = `${serverUrl}/api/gemini/proxy/gemini-2.5-flash`;
+      const endpoint = `${serverUrl}/api/llm`;
 
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'gemini-proxy',
+          model: 'gemini-2.5-flash',
           contents: [{ parts }],
           generationConfig: {
             temperature: 0.3,

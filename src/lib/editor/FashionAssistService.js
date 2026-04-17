@@ -68,9 +68,11 @@ export class FashionAssistService {
     }
 
     const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:4000';
-    const endpoint = `${serverUrl}/api/gemini/proxy/${this.model}`;
+    const endpoint = `${serverUrl}/api/llm`;
 
     const body = {
+      action: 'gemini-proxy',
+      model: this.model,
       contents: [
         {
           parts: [
