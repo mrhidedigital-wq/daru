@@ -22,7 +22,6 @@ export default function SBFrame({ frame, index, isActive, onActivate, onFileUplo
       setShowRef(false);
     }
   }, [generatedImage, status]);
-
   const isLandscape = (resolution || '16:9') === '16:9';
   const st = STATUS_LABELS[status] || STATUS_LABELS.empty;
 

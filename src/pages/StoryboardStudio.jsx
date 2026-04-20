@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   C, PLANO_DESCRIPCION, ANGULO_DESCRIPCION_H, ANGULO_DESCRIPCION_V, LENTES,
@@ -120,6 +120,12 @@ const buildFramePrompt = (frame) => {
     ? `Add the following props naturally to the scene: ${props.join(', ')}.`
     : '';
 
+  const expressionLines = (subjects || []).map(s =>
+    s.expression
+      ? `"${s.label}": expression = ${s.expression}`
+      : `"${s.label}": keep original expression`
+  ).join('\n');
+
   return `
 ${styleInstruction}
 
@@ -140,31 +146,46 @@ IMPORTANT:
 - Do NOT change anything not mentioned above
 - Maintain exact composition and scene layout from reference
 - ${styleInstruction}
+
+FACIAL EXPRESSIONS (follow exactly):
+${expressionLines || 'Keep all expressions as in the reference image.'}
   `.trim();
 };
 
-const buildTurnaroundPrompt = (subject, viewKey) => {
+const buildTurnaroundPrompt = (subject, viewKey, hasFaceImage) => {
   const viewDescriptions = {
-    frontal:     "front view, facing camera directly, full frontal",
-    lateral_izq: "left side profile, camera at 90° to subject's left, subject facing right",
-    lateral_der: "right side profile, camera at 90° to subject's right, subject facing left",
-    perfil:      "pure side profile view",
-    espalda:     "back view, subject facing away from camera",
+    frontal:     "FRONT VIEW — subject facing camera directly, full body visible from head to toe",
+    lateral_izq: "LEFT SIDE VIEW — camera at 90° to subject's left, subject facing right, full body head to toe",
+    lateral_der: "RIGHT SIDE VIEW — camera at 90° to subject's right, subject facing left, full body head to toe",
+    perfil:      "PURE SIDE PROFILE — full body visible from head to toe",
+    espalda:     "BACK VIEW — subject facing away from camera, full body head to toe",
   };
-  return `
-Generate a character turnaround view.
-Character description: ${subject.description || ''}
-${subject.customDescription ? `Custom description: ${subject.customDescription}` : ''}
 
-View to generate: ${viewDescriptions[viewKey] || viewKey}
+  const faceInstruction = hasFaceImage
+    ? `FACE: Use the face from the FIRST reference image as the character's face. Apply it exactly — same person, same features.`
+    : `FACE: Maintain the face consistent with the character description.`;
 
-IMPORTANT:
-- Keep EXACT same character design, clothing, colors, and style
-- Plain/neutral background
-- Full body visible
-- Maintain the exact same visual style (animation/photo/illustration)
-- This is a character sheet view, not a scene
-  `.trim();
+  const bodyInstruction = subject.customDescription?.trim()
+    ? `BODY & CLOTHING: ${subject.customDescription}`
+    : `BODY & CLOTHING: ${subject.description || 'as described'}`;
+
+  return `You are generating a CHARACTER SHEET VIEW for a storyboard.
+
+${faceInstruction}
+${bodyInstruction}
+
+VIEW TO GENERATE: ${viewDescriptions[viewKey] || viewKey}
+
+MANDATORY RULES:
+- Show the COMPLETE BODY from head to toe — no cropping
+- Neutral/plain background (white, light grey, or dark studio)
+- Standing pose, neutral relaxed position
+- High detail on face, clothing, and accessories
+- Photorealistic quality matching the reference style
+- This is a character reference sheet, NOT a scene or environment
+- DO NOT add other characters, props, or background elements
+${hasFaceImage ? '- The face in the FIRST reference image is the IDENTITY of this character — use it exactly' : ''}
+`.trim();
 };
 
 // ── error messages ─────────────────────────────────────────────
@@ -187,7 +208,12 @@ export default function StoryboardStudio() {
   const [resolution, setResolution] = useState('16:9');
   const [leftTab, setLeftTab] = useState('personajes');
   const [activeSubjectId, setActiveSubjectId] = useState(null);
-  const [lastApplied, setLastApplied] = useState(null);
+  const [lastApplied, setLastApplied] = useState(null); // frameId del último cambio aplicado
+
+  // Always-current ref so async callbacks (applySubjectChanges, etc.)
+  // never read a stale closure snapshot of frames.
+  const framesRef = useRef(frames);
+  useEffect(() => { framesRef.current = frames; }, [frames]);
 
   const activeFrame = frames.find(f => f.id === activeFrameId) || null;
 
@@ -239,20 +265,24 @@ export default function StoryboardStudio() {
 
   const analyzeFrame = async (frameId, imageBase64) => {
     try {
+      const mimeType = imageBase64.split(';')[0].split(':')[1] || 'image/jpeg';
+
+      const body = {
+        action: 'gemini-proxy',
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType, data: imageBase64.split(',')[1] } },
+            { text: ANALYSIS_PROMPT },
+          ],
+        }],
+        generationConfig: { responseModalities: ['TEXT'] },
+      };
+
       const res = await fetch('/api/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'gemini-proxy',
-          contents: [{
-            role: 'user',
-            parts: [
-              { inlineData: { mimeType: 'image/jpeg', data: imageBase64.split(',')[1] } },
-              { text: ANALYSIS_PROMPT },
-            ],
-          }],
-          generationConfig: { responseModalities: ['TEXT'] },
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -273,6 +303,7 @@ export default function StoryboardStudio() {
         costumeImage: null,
         keepCostume: true,
         customDescription: '',
+        expression: '',
         turnaround: { frontal: null, lateral_izq: null, lateral_der: null, perfil: null, espalda: null },
         selectedViews: ['frontal'],
       }));
@@ -293,16 +324,16 @@ export default function StoryboardStudio() {
   };
 
   const retryAnalysis = async (frameId) => {
-    const frame = frames.find(f => f.id === frameId);
+    const frame = framesRef.current.find(f => f.id === frameId);
     if (!frame?.referenceImage) return;
-    updateFrame(frameId, { status: 'analyzing' });
+    updateFrame(frameId, { status: 'analyzing', errorMsg: null, analysis: null, subjects: [] });
     await analyzeFrame(frameId, frame.referenceImage);
   };
 
   // ── generation ─────────────────────────────────────────────
 
   const generateFrame = async (frameId) => {
-    const frame = frames.find(f => f.id === frameId);
+    const frame = framesRef.current.find(f => f.id === frameId);
     if (!frame) return;
 
     updateFrame(frameId, { status: 'generating' });
@@ -336,6 +367,7 @@ export default function StoryboardStudio() {
   const [applyingReframe, setApplyingReframe] = useState(false);
 
   const applyReframe = async (shotType, angleH, angleV, targetSubject) => {
+    const activeFrame = framesRef.current.find(f => f.id === activeFrameId);
     if (!activeFrame?.generatedImage) return;
     setApplyingReframe(true);
     try {
@@ -348,6 +380,11 @@ Reframe this image:
 ${targetSubject ? `- Focus on: ${targetSubject}` : ''}
 Keep all characters, style, lighting, and scene content identical.
 Only change the framing and camera position.
+
+EXPRESSIONS & EMOTIONS:
+- Preserve the exact facial expression of every character as shown in the reference image.
+- If a character is smiling, keep the smile. If neutral, keep neutral.
+- Do NOT change any facial expression unless explicitly told to do so.
       `.trim();
 
       const result = await generateImageWithConversation(
@@ -378,6 +415,7 @@ Only change the framing and camera position.
   const [applyingProps, setApplyingProps] = useState(false);
 
   const applyProps = async (newProp, targetSubject) => {
+    const activeFrame = framesRef.current.find(f => f.id === activeFrameId);
     if (!activeFrame?.generatedImage) return;
     setApplyingProps(true);
     try {
@@ -386,6 +424,11 @@ Add the following prop to the image: ${newProp}
 ${targetSubject ? `Add it to/near: ${targetSubject}` : 'Add it naturally to the scene'}
 Keep all existing characters, style, lighting, background, and composition identical.
 Only add the new prop in a natural and contextually appropriate way.
+
+EXPRESSIONS & EMOTIONS:
+- Preserve the exact facial expression of every character as shown in the reference image.
+- If a character is smiling, keep the smile. If neutral, keep neutral.
+- Do NOT change any facial expression unless explicitly told to do so.
       `.trim();
 
       const result = await generateImageWithConversation(
@@ -417,32 +460,54 @@ Only add the new prop in a natural and contextually appropriate way.
 
   const generateTurnaround = async (subjectId, viewKeys) => {
     if (!activeFrameId) return;
-    const frame = frames.find(f => f.id === activeFrameId);
+    const frame = framesRef.current.find(f => f.id === activeFrameId);
     const subject = frame?.subjects?.find(s => s.id === subjectId);
     if (!subject) return;
+    if (!viewKeys || viewKeys.length === 0) return;
 
     setGeneratingViews(prev => ({ ...prev, [subjectId]: true }));
+
+    // Face image goes FIRST — it's the primary identity reference for Gemini
+    // Then the scene image for clothing/body context, then already-generated views
+    const baseImage = frame.referenceImage || frame.generatedImage;
+    const hasFaceImage = !!subject.faceImage;
+
     try {
       const refImages = [
-        frame.referenceImage,
-        subject.faceImage,
-        ...Object.values(subject.turnaround).filter(Boolean),
+        subject.faceImage,   // FIRST: face identity (most important)
+        baseImage,           // SECOND: scene context (body, clothing, style)
+        ...Object.values(subject.turnaround).filter(Boolean),  // coherence refs
       ].filter(Boolean);
+
+      const accumulatedTurnaround = { ...subject.turnaround };
+      let lastError = null;
 
       for (const viewKey of viewKeys) {
         try {
-          const prompt = buildTurnaroundPrompt(subject, viewKey);
+          const prompt = buildTurnaroundPrompt(subject, viewKey, hasFaceImage);
           const result = await generateImageWithGemini(prompt, refImages, '1:1');
+          accumulatedTurnaround[viewKey] = result;
+          refImages.push(result);
           updateSubject(activeFrameId, subjectId, {
-            turnaround: { ...subject.turnaround, [viewKey]: result },
+            turnaround: { ...accumulatedTurnaround },
           });
-          // refresh subject reference for next iteration
-          const updated = frames.find(f => f.id === activeFrameId)?.subjects?.find(s => s.id === subjectId);
-          if (updated) refImages.push(result);
-        } catch (_) {
-          // continue with other views on error
+        } catch (err) {
+          console.error(`[Turnaround] Error generando vista "${viewKey}":`, err);
+          lastError = err;
         }
       }
+
+      // Surface error if ALL views failed
+      const anyGenerated = viewKeys.some(k => accumulatedTurnaround[k]);
+      if (!anyGenerated && lastError) {
+        updateFrame(activeFrameId, {
+          status: 'error',
+          errorMsg: `No se pudo generar las vistas: ${friendlyError(lastError)}`,
+        });
+      }
+    } catch (err) {
+      console.error('[Turnaround] Error inesperado:', err);
+      updateFrame(activeFrameId, { status: 'error', errorMsg: friendlyError(err) });
     } finally {
       setGeneratingViews(prev => ({ ...prev, [subjectId]: false }));
     }
@@ -452,16 +517,27 @@ Only add the new prop in a natural and contextually appropriate way.
 
   const applySubjectChanges = async () => {
     if (!activeFrameId || !activeSubjectId) return;
-    const frame = frames.find(f => f.id === activeFrameId);
-    const subject = frame?.subjects?.find(s => s.id === activeSubjectId);
-    if (!frame || !subject) return;
+    const currentFrame = framesRef.current.find(f => f.id === activeFrameId);
+    const currentSubject = currentFrame?.subjects?.find(s => s.id === activeSubjectId);
+    if (!currentFrame || !currentSubject) return;
+
+    const frame = currentFrame;
+    const subject = currentSubject;
 
     updateFrame(activeFrameId, { status: 'generating' });
 
     try {
+      const baseImage = frame.generatedImage || frame.referenceImage;
+
+      // Priority: turnaround frontal > faceImage > nothing
+      const turnaroundFrontal = subject.turnaround?.frontal || null;
+      const characterRef = turnaroundFrontal || subject.faceImage || null;
+      const hasTurnaround = !!turnaroundFrontal;
+      const hasFaceOnly = !turnaroundFrontal && !!subject.faceImage;
+
       const refImages = [
-        frame.referenceImage,
-        subject.faceImage || null,
+        baseImage,
+        characterRef,
         (!subject.keepCostume && subject.costumeImage) ? subject.costumeImage : null,
       ].filter(Boolean);
 
@@ -472,14 +548,23 @@ Only add the new prop in a natural and contextually appropriate way.
       let characterInstruction = '';
       if (subject.customDescription?.trim()) {
         characterInstruction = `REPLACE the character "${subject.label}" completely with: ${subject.customDescription}. Keep their position in the scene (${subject.position}).`;
+      } else if (hasTurnaround) {
+        characterInstruction = `CHARACTER TO REPLACE: "${subject.label}"
+REPLACE this character in the scene with the character shown in the SECOND reference image.
+The SECOND image is a full-body frontal character sheet — use it as the exact appearance of the new character.
+Match their position (${subject.position}), pose, and scale to fit naturally in the scene.
+If the original shot only showed part of the body, show the same portion of the new character.`;
       } else {
-        const faceInstr = subject.faceImage
-          ? `REPLACE only the FACE of "${subject.label}" with the face shown in the SECOND reference image. Keep body, pose, position identical.`
+        const faceInstr = hasFaceOnly
+          ? `FACE SWAP: Take the face from the SECOND image and place it exactly on the body of "${subject.label}" in the FIRST image. Match the face angle, lighting, and skin tone to fit naturally. Keep the body, clothing, pose, and position 100% identical to the FIRST image. Only the face region changes — everything else stays the same.`
           : `Keep the face of "${subject.label}" exactly as in the original.`;
+        const expressionInstr = subject.expression
+          ? `FACIAL EXPRESSION for "${subject.label}": Change their expression to ${subject.expression}. Apply this expression naturally while respecting face shape and lighting.`
+          : `FACIAL EXPRESSION for "${subject.label}": Keep the exact same facial expression as shown in the reference. Do NOT change it.`;
         const costumeInstr = (!subject.keepCostume && subject.costumeImage)
           ? `REPLACE the costume of "${subject.label}" with the clothing in the THIRD reference image. Keep body shape and pose identical.`
           : `Keep the original costume of "${subject.label}" EXACTLY: ${subject.description}`;
-        characterInstruction = `CHARACTER TO MODIFY: "${subject.label}"\n${faceInstr}\n${costumeInstr}`;
+        characterInstruction = `CHARACTER TO MODIFY: "${subject.label}"\n${faceInstr}\n${expressionInstr}\n${costumeInstr}`;
       }
 
       const otherSubjects = frame.subjects
@@ -499,8 +584,8 @@ ${otherSubjects || 'No other characters.'}
 
 KEEP IDENTICAL: background, lighting, composition, shot type, all props, visual style.
 
-The FIRST image is the scene reference (base composition).
-${subject.faceImage ? 'The SECOND image is the NEW FACE to apply.' : ''}
+The FIRST image is the current scene (base composition).
+${characterRef ? (hasTurnaround ? 'The SECOND image is the FULL BODY CHARACTER to insert into the scene.' : 'The SECOND image is the NEW FACE to apply.') : ''}
 ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW COSTUME to apply.' : ''}
       `.trim();
 
@@ -509,6 +594,7 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
       updateFrame(activeFrameId, {
         generatedImage: result,
         status: 'done',
+        errorMsg: null,
         conversationHistory: [
           { role: 'user', parts: [{ text: prompt }] },
           { role: 'model', parts: [{ inlineData: { mimeType: 'image/jpeg', data: result.split(',')[1] } }] },
@@ -517,6 +603,9 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
 
       setLastApplied(activeFrameId);
       setTimeout(() => setLastApplied(null), 3000);
+
+      setLeftTab('personajes');
+      setActiveSubjectId(null);
     } catch (err) {
       updateFrame(activeFrameId, { status: 'error', errorMsg: friendlyError(err) });
     }
@@ -530,7 +619,9 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
     link.href = frame.generatedImage;
     const resLabel = frame.resolution === '9:16' ? 'reel' : 'landscape';
     link.download = `storyboard-frame-${frame.id.slice(0, 8)}-${resLabel}.png`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   };
 
   // ── subject click ──────────────────────────────────────────
@@ -567,6 +658,28 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
     }
 
     if (activeFrame.status === 'analyzed') {
+      // If user selected a subject to edit, show the subject editor even before generating
+      if (activeSubjectId) {
+        const activeSubject = activeFrame.subjects?.find(s => s.id === activeSubjectId);
+        if (activeSubject) {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button style={S.backBtn} onClick={() => setActiveSubjectId(null)}>
+                ← VOLVER AL ANÁLISIS
+              </button>
+              <div style={{ marginTop: 10 }}>
+                <SBSubjectEditor
+                  subject={activeSubject}
+                  onUpdate={(updates) => updateSubject(activeFrameId, activeSubjectId, updates)}
+                  onGenerateTurnaround={(subId, views) => generateTurnaround(subId, views)}
+                  onApplyChanges={applySubjectChanges}
+                  generatingViews={generatingViews[activeSubjectId] || false}
+                />
+              </div>
+            </div>
+          );
+        }
+      }
       if (activeFrame.analysis?.error) {
         return (
           <div style={{ padding: '0 2px' }}>
@@ -618,7 +731,7 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
       const activeSubject = activeFrame.subjects?.find(s => s.id === activeSubjectId);
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Cambios aplicados banner */}
+          {/* Banner de cambios aplicados */}
           {lastApplied === activeFrameId && (
             <div style={{
               background: `${C.success}15`,
@@ -635,6 +748,7 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
               ✓ CAMBIOS APLICADOS
             </div>
           )}
+
           {/* Tabs */}
           <div style={S.tabs}>
             {[
