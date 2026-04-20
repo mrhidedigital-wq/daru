@@ -152,7 +152,7 @@ export default function SBSubjectEditor({ subject, onUpdate, onGenerateTurnaroun
         }}
         onClick={onApplyChanges}
       >
-        ✓ APLICAR CAMBIOS AL FRAME
+        🔥 APLICAR CAMBIOS AL FRAME 🔥
       </button>
 
       {/* Turnaround */}

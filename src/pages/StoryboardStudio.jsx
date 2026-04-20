@@ -255,25 +255,41 @@ export default function StoryboardStudio() {
 
   const analyzeFrame = async (frameId, imageBase64) => {
     try {
+      console.log('[analyze] iniciando, imageBase64 length:', imageBase64?.length);
+      console.log('[analyze] primer 50 chars:', imageBase64?.slice(0, 50));
+      console.log('[analyze] prompt length:', ANALYSIS_PROMPT?.length);
+
+      const mimeType = imageBase64.split(';')[0].split(':')[1] || 'image/jpeg';
+      console.log('[analyze] mimeType detectado:', mimeType);
+
+      const body = {
+        action: 'gemini-proxy',
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType, data: imageBase64.split(',')[1] } },
+            { text: ANALYSIS_PROMPT },
+          ],
+        }],
+        generationConfig: { responseModalities: ['TEXT'] },
+      };
+
+      console.log('[analyze] enviando request a /api/llm');
       const res = await fetch('/api/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'gemini-proxy',
-          contents: [{
-            role: 'user',
-            parts: [
-              { inlineData: { mimeType: 'image/jpeg', data: imageBase64.split(',')[1] } },
-              { text: ANALYSIS_PROMPT },
-            ],
-          }],
-          generationConfig: { responseModalities: ['TEXT'] },
-        }),
+        body: JSON.stringify(body),
       });
 
+      console.log('[analyze] response status:', res.status);
       const data = await res.json();
+      console.log('[analyze] response data:', JSON.stringify(data).slice(0, 500));
+
       const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      console.log('[analyze] rawText:', rawText.slice(0, 300));
+
       const analysis = parseJSON(rawText);
+      console.log('[analyze] parsed analysis:', analysis);
 
       if (analysis.error) {
         updateFrame(frameId, { status: 'analyzed', analysis });
@@ -304,6 +320,7 @@ export default function StoryboardStudio() {
       });
 
     } catch (err) {
+      console.log('[analyze] ERROR:', err.message, err);
       updateFrame(frameId, { status: 'error', errorMsg: 'No se pudo analizar la imagen. Intenta de nuevo.' });
     }
   };
@@ -484,6 +501,7 @@ Only add the new prop in a natural and contextually appropriate way.
   // ── subject changes ────────────────────────────────────────
 
   const applySubjectChanges = async () => {
+    alert('applySubjectChanges ejecutado');
     if (!activeFrameId || !activeSubjectId) return;
     const frame = framesRef.current.find(f => f.id === activeFrameId);
     const subject = frame?.subjects?.find(s => s.id === activeSubjectId);
