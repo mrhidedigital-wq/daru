@@ -120,6 +120,12 @@ export default function DaruDashboard() {
             ✨ EDITOR
           </button>
           <button
+            style={{ ...styles.navBtn, ...styles.navBtnStoryboard }}
+            onClick={() => navigate('/storyboard')}
+          >
+            🎞 STORYBOARD
+          </button>
+          <button
             style={{ ...styles.navBtn, color: C.dim, borderColor: C.border }}
             onClick={() => navigate('/settings')}
           >
@@ -160,6 +166,26 @@ export default function DaruDashboard() {
             </div>
           </div>
           <div style={styles.editorCta}>ABRIR EDITOR →</div>
+        </div>
+
+        {/* ── STORYBOARD STUDIO ACCESS CARD ── */}
+        <div
+          onClick={() => navigate('/storyboard')}
+          style={styles.storyboardCard}
+          onMouseEnter={(e) => e.currentTarget.style.borderColor = '#00A8E8'}
+          onMouseLeave={(e) => e.currentTarget.style.borderColor = C.border}
+        >
+          <div style={styles.editorCardLeft}>
+            <div style={{ ...styles.editorIcon, background: 'rgba(0,168,232,0.1)' }}>🎞</div>
+            <div>
+              <div style={{ ...styles.editorTitle, color: C.accent }}>STORYBOARD STUDIO</div>
+              <div style={styles.editorSub}>
+                Sube una imagen de referencia y genera frames de storyboard con Gemini.
+                Modifica personajes, cambia planos, agrega props y descarga cada frame generado.
+              </div>
+            </div>
+          </div>
+          <div style={{ ...styles.editorCta, color: C.accent }}>ABRIR →</div>
         </div>
 
         {/* Section header */}
@@ -375,6 +401,7 @@ const styles = {
   topNav: { display: 'flex', alignItems: 'center', gap: 6 },
   navBtn: { background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 4, color: C.muted, padding: '5px 14px', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer', fontFamily: 'monospace', transition: 'all 0.15s' },
   navBtnEditor: { borderColor: '#7C3AED', color: '#7C3AED', background: 'rgba(124,58,237,0.08)' },
+  navBtnStoryboard: { borderColor: C.accent, color: C.accent, background: 'rgba(0,168,232,0.08)' },
   userEmail: { fontSize: 10, color: C.muted, fontFamily: 'monospace' },
   btnLogout: { background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 4, color: C.muted, padding: '4px 12px', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer', fontFamily: 'monospace' },
   main: { flex: 1, maxWidth: 1200, width: '100%', margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 24 },
@@ -407,6 +434,7 @@ const styles = {
   errorBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,71,87,0.15)', borderTop: `1px solid ${C.error}`, padding: '8px 24px', fontSize: 11, color: C.error, fontFamily: 'monospace' },
   errorClose: { background: 'transparent', border: 'none', color: C.error, cursor: 'pointer', fontSize: 14 },
   editorCard: { background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'border-color 0.2s' },
+  storyboardCard: { background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'border-color 0.2s' },
   editorCardLeft: { display: 'flex', alignItems: 'center', gap: 16 },
   editorIcon: { fontSize: 32, width: 52, height: 52, background: 'rgba(124,58,237,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   editorTitle: { fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', color: '#7C3AED', fontFamily: 'monospace', marginBottom: 4 },

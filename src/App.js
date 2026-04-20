@@ -8,6 +8,7 @@ import DaruStudio        from './pages/DaruStudio';
 import DaruEditor        from './pages/DaruEditor';
 import AssetManager      from './pages/AssetManager';
 import ApiKeysSettings   from './pages/ApiKeysSettings';
+import StoryboardStudio  from './pages/StoryboardStudio';
 
 function App() {
   return (
@@ -38,6 +39,13 @@ function App() {
           } />
           <Route path="/editor/:sessionId" element={
             <ProtectedRoute><DaruEditor /></ProtectedRoute>
+          } />
+
+          <Route path="/storyboard" element={
+            <ProtectedRoute><StoryboardStudio /></ProtectedRoute>
+          } />
+          <Route path="/storyboard/:projectId" element={
+            <ProtectedRoute><StoryboardStudio /></ProtectedRoute>
           } />
 
           <Route path="*" element={
