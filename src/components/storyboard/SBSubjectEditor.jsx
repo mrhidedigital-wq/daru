@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
 import { C } from '../../services/assetUtils';
+import SBTurnaround from './SBTurnaround';
+import { ACCEPTED } from '../studio/frameUploaderConfig';
 
 const EXPRESSIONS = [
   { value: '',          label: 'ORIGINAL',       emoji: '🔒' },
@@ -12,8 +14,6 @@ const EXPRESSIONS = [
   { value: 'thinking',  label: 'PENSATIVO/A',     emoji: '🤔' },
   { value: 'confident', label: 'SEGURO/A',        emoji: '😎' },
 ];
-import SBTurnaround from './SBTurnaround';
-import { ACCEPTED } from '../studio/frameUploaderConfig';
 
 const fileToBase64 = file => new Promise((resolve, reject) => {
   const r = new FileReader();
