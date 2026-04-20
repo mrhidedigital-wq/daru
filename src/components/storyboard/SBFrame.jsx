@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { C } from '../../services/assetUtils';
 import { ACCEPTED } from '../studio/frameUploaderConfig';
 
@@ -16,6 +16,13 @@ export default function SBFrame({ frame, index, isActive, onActivate, onFileUplo
   const [showRef, setShowRef] = useState(false);
 
   const { status, referenceImage, generatedImage, errorMsg, resolution } = frame;
+
+  useEffect(() => {
+    if (status === 'done') {
+      setShowRef(false);
+    }
+  }, [generatedImage, status]);
+
   const isLandscape = (resolution || '16:9') === '16:9';
   const st = STATUS_LABELS[status] || STATUS_LABELS.empty;
 
@@ -44,6 +51,7 @@ export default function SBFrame({ frame, index, isActive, onActivate, onFileUplo
       style={{
         ...S.card,
         borderColor: isActive ? C.accent : C.border,
+        boxShadow: isActive ? `0 0 0 2px ${C.accent}40` : 'none',
         cursor: 'pointer',
       }}
     >
