@@ -210,7 +210,11 @@ export default function StoryboardStudio() {
   // ── state helpers ──────────────────────────────────────────
 
   const updateFrame = useCallback((id, updates) => {
-    setFrames(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+    setFrames(prev => {
+      const match = prev.find(f => f.id === id);
+      if (!match) console.warn('[updateFrame] NO match para id:', id, '— frames ids:', prev.map(f => f.id));
+      return prev.map(f => f.id === id ? { ...f, ...updates } : f);
+    });
   }, []);
 
   const updateSubject = useCallback((frameId, subjectId, updates) => {
@@ -571,10 +575,12 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
       console.log('[apply] llamando generateImageWithGemini con', refImages.length, 'imágenes');
       const result = await generateImageWithGemini(prompt, refImages, frame.resolution || '16:9');
       console.log('[apply] ÉXITO — imagen generada, length:', result?.length);
+      console.log('[apply] updateFrame llamado con status done, frameId:', activeFrameId);
 
       updateFrame(activeFrameId, {
         generatedImage: result,
         status: 'done',
+        errorMsg: null,
         conversationHistory: [
           { role: 'user', parts: [{ text: prompt }] },
           { role: 'model', parts: [{ inlineData: { mimeType: 'image/jpeg', data: result.split(',')[1] } }] },
