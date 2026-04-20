@@ -65,7 +65,26 @@ export default function SBSubjectEditor({ subject, onUpdate, onGenerateTurnaroun
         <span style={S.positionBadge}>{subject.position}</span>
       </div>
 
-      <div style={S.descText}>{subject.description}</div>
+      <div style={S.label}>DESCRIPCIÓN DEL PERSONAJE</div>
+      <textarea
+        value={subject.description || ''}
+        onChange={e => onUpdate({ description: e.target.value })}
+        rows={3}
+        style={{
+          background: C.card,
+          border: `1px solid ${C.border}`,
+          borderRadius: 4,
+          color: C.text,
+          padding: '8px 10px',
+          fontSize: 10,
+          outline: 'none',
+          fontFamily: 'monospace',
+          resize: 'vertical',
+          width: '100%',
+          boxSizing: 'border-box',
+          lineHeight: 1.5,
+        }}
+      />
 
       {/* Cara */}
       <div style={S.section}>
