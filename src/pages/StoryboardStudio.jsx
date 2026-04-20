@@ -143,65 +143,6 @@ IMPORTANT:
   `.trim();
 };
 
-// ── subject changes prompt ─────────────────────────────────────
-// Builds prompt + ordered refImages array so Gemini knows exactly
-// which image is the scene, which is the new face, which is the costume.
-
-const ORDINALS = ['FIRST', 'SECOND', 'THIRD', 'FOURTH'];
-
-const buildSubjectChangesPrompt = (frame, subject) => {
-  const { analysis, styleMode } = frame;
-
-  const styleInstruction = styleMode === 'animation'
-    ? 'Maintain the exact animation/illustration style of the first reference image. Do not make it photorealistic.'
-    : styleMode === 'photo'
-    ? 'Maintain photorealistic photography style matching the first reference image.'
-    : `Maintain the exact visual style: ${analysis?.estilo_descripcion || 'as shown in the first reference image'}`;
-
-  const refImages = [frame.referenceImage].filter(Boolean);
-  const imageNotes = [
-    'The FIRST image is the scene reference — use it for style, composition, background, lighting, and all characters not being modified.',
-  ];
-
-  if (subject.faceImage) {
-    refImages.push(subject.faceImage);
-    imageNotes.push(`The ${ORDINALS[refImages.length - 1]} image is the NEW FACE to apply to "${subject.label}" — replace only their face, keep body and costume.`);
-  }
-
-  if (!subject.keepCostume && subject.costumeImage) {
-    refImages.push(subject.costumeImage);
-    imageNotes.push(`The ${ORDINALS[refImages.length - 1]} image is the NEW COSTUME to apply to "${subject.label}" — replace their outfit with this one.`);
-  }
-
-  let subjectInstruction;
-  if (subject.customDescription) {
-    subjectInstruction = `Replace "${subject.label}" entirely with this character: ${subject.customDescription}`;
-  } else {
-    const changes = [];
-    if (subject.faceImage) changes.push(`apply the new face from image ${refImages.indexOf(subject.faceImage) + 1}`);
-    if (!subject.keepCostume && subject.costumeImage) changes.push(`apply the new costume from image ${refImages.indexOf(subject.costumeImage) + 1}`);
-    if (subject.keepCostume) changes.push(`keep the original costume exactly as in the scene reference: ${subject.description || ''}`);
-    subjectInstruction = `Modify "${subject.label}": ${changes.join(', ')}.`;
-  }
-
-  return {
-    prompt: `
-${imageNotes.join('\n')}
-
-${styleInstruction}
-
-TASK: Apply the following character change to the scene:
-
-${subjectInstruction}
-
-Keep ALL other characters exactly as shown in the first (scene reference) image.
-Keep the background, lighting, composition, framing, and overall style identical to the first image.
-Only modify "${subject.label}" as instructed above.
-    `.trim(),
-    refImages,
-  };
-};
-
 const buildTurnaroundPrompt = (subject, viewKey) => {
   const viewDescriptions = {
     frontal:     "front view, facing camera directly, full frontal",
