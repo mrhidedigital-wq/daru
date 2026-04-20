@@ -143,28 +143,41 @@ IMPORTANT:
   `.trim();
 };
 
-const buildTurnaroundPrompt = (subject, viewKey) => {
+const buildTurnaroundPrompt = (subject, viewKey, hasFaceImage) => {
   const viewDescriptions = {
-    frontal:     "front view, facing camera directly, full frontal",
-    lateral_izq: "left side profile, camera at 90° to subject's left, subject facing right",
-    lateral_der: "right side profile, camera at 90° to subject's right, subject facing left",
-    perfil:      "pure side profile view",
-    espalda:     "back view, subject facing away from camera",
+    frontal:     "FRONT VIEW — subject facing camera directly, full body visible from head to toe",
+    lateral_izq: "LEFT SIDE VIEW — camera at 90° to subject's left, subject facing right, full body head to toe",
+    lateral_der: "RIGHT SIDE VIEW — camera at 90° to subject's right, subject facing left, full body head to toe",
+    perfil:      "PURE SIDE PROFILE — full body visible from head to toe",
+    espalda:     "BACK VIEW — subject facing away from camera, full body head to toe",
   };
-  return `
-Generate a character turnaround view.
-Character description: ${subject.description || ''}
-${subject.customDescription ? `Custom description: ${subject.customDescription}` : ''}
 
-View to generate: ${viewDescriptions[viewKey] || viewKey}
 
-IMPORTANT:
-- Keep EXACT same character design, clothing, colors, and style
-- Plain/neutral background
-- Full body visible
-- Maintain the exact same visual style (animation/photo/illustration)
-- This is a character sheet view, not a scene
-  `.trim();
+  const faceInstruction = hasFaceImage
+    ? `FACE: Use the face from the FIRST reference image as the character's face. Apply it exactly — same person, same features.`
+    : `FACE: Maintain the face consistent with the character description.`;
+
+  const bodyInstruction = subject.customDescription?.trim()
+    ? `BODY & CLOTHING: ${subject.customDescription}`
+    : `BODY & CLOTHING: ${subject.description || 'as described'}`;
+
+  return `You are generating a CHARACTER SHEET VIEW for a storyboard.
+
+${faceInstruction}
+${bodyInstruction}
+
+VIEW TO GENERATE: ${viewDescriptions[viewKey] || viewKey}
+
+MANDATORY RULES:
+- Show the COMPLETE BODY from head to toe — no cropping
+- Neutral/plain background (white, light grey, or dark studio)
+- Standing pose, neutral relaxed position
+- High detail on face, clothing, and accessories
+- Photorealistic quality matching the reference style
+- This is a character reference sheet, NOT a scene or environment
+- DO NOT add other characters, props, or background elements
+${hasFaceImage ? '- The face in the FIRST reference image is the IDENTITY of this character — use it exactly' : ''}
+`.trim();
 };
 
 // ── error messages ─────────────────────────────────────────────
@@ -418,14 +431,16 @@ Only add the new prop in a natural and contextually appropriate way.
 
     setGeneratingViews(prev => ({ ...prev, [subjectId]: true }));
 
-    // Use best available image for character reference
+    // Face image goes FIRST — it's the primary identity reference for Gemini
+    // Then the scene image for clothing/body context, then already-generated views
     const baseImage = frame.referenceImage || frame.generatedImage;
+    const hasFaceImage = !!subject.faceImage;
 
     try {
       const refImages = [
-        baseImage,
-        subject.faceImage,
-        ...Object.values(subject.turnaround).filter(Boolean),
+        subject.faceImage,   // FIRST: face identity (most important)
+        baseImage,           // SECOND: scene context (body, clothing, style)
+        ...Object.values(subject.turnaround).filter(Boolean),  // coherence refs
       ].filter(Boolean);
 
       const accumulatedTurnaround = { ...subject.turnaround };
@@ -433,7 +448,7 @@ Only add the new prop in a natural and contextually appropriate way.
 
       for (const viewKey of viewKeys) {
         try {
-          const prompt = buildTurnaroundPrompt(subject, viewKey);
+          const prompt = buildTurnaroundPrompt(subject, viewKey, hasFaceImage);
           const result = await generateImageWithGemini(prompt, refImages, '1:1');
           accumulatedTurnaround[viewKey] = result;
           refImages.push(result);
