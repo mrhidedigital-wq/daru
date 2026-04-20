@@ -594,6 +594,7 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
       });
 
       setLeftTab('personajes');
+      setActiveSubjectId(null);
     } catch (err) {
       updateFrame(activeFrameId, { status: 'error', errorMsg: friendlyError(err) });
     }
