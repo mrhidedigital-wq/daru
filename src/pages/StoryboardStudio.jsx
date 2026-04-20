@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   C, PLANO_DESCRIPCION, ANGULO_DESCRIPCION_H, ANGULO_DESCRIPCION_V, LENTES,
@@ -199,6 +199,11 @@ export default function StoryboardStudio() {
   const [resolution, setResolution] = useState('16:9');
   const [leftTab, setLeftTab] = useState('personajes');
   const [activeSubjectId, setActiveSubjectId] = useState(null);
+
+  // Always-current ref so async callbacks (applySubjectChanges, etc.)
+  // never read a stale closure snapshot of frames.
+  const framesRef = useRef(frames);
+  useEffect(() => { framesRef.current = frames; }, [frames]);
 
   const activeFrame = frames.find(f => f.id === activeFrameId) || null;
 
@@ -480,7 +485,7 @@ Only add the new prop in a natural and contextually appropriate way.
 
   const applySubjectChanges = async () => {
     if (!activeFrameId || !activeSubjectId) return;
-    const frame = frames.find(f => f.id === activeFrameId);
+    const frame = framesRef.current.find(f => f.id === activeFrameId);
     const subject = frame?.subjects?.find(s => s.id === activeSubjectId);
     if (!frame || !subject) return;
 
