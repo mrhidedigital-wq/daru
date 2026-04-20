@@ -332,7 +332,7 @@ export default function StoryboardStudio() {
   // ── generation ─────────────────────────────────────────────
 
   const generateFrame = async (frameId) => {
-    const frame = frames.find(f => f.id === frameId);
+    const frame = framesRef.current.find(f => f.id === frameId);
     if (!frame) return;
 
     updateFrame(frameId, { status: 'generating' });
@@ -361,6 +361,7 @@ export default function StoryboardStudio() {
   const [applyingReframe, setApplyingReframe] = useState(false);
 
   const applyReframe = async (shotType, angleH, angleV, targetSubject) => {
+    const activeFrame = framesRef.current.find(f => f.id === activeFrameId);
     if (!activeFrame?.generatedImage) return;
     setApplyingReframe(true);
     try {
@@ -408,6 +409,7 @@ EXPRESSIONS & EMOTIONS:
   const [applyingProps, setApplyingProps] = useState(false);
 
   const applyProps = async (newProp, targetSubject) => {
+    const activeFrame = framesRef.current.find(f => f.id === activeFrameId);
     if (!activeFrame?.generatedImage) return;
     setApplyingProps(true);
     try {
@@ -452,7 +454,7 @@ EXPRESSIONS & EMOTIONS:
 
   const generateTurnaround = async (subjectId, viewKeys) => {
     if (!activeFrameId) return;
-    const frame = frames.find(f => f.id === activeFrameId);
+    const frame = framesRef.current.find(f => f.id === activeFrameId);
     const subject = frame?.subjects?.find(s => s.id === subjectId);
     if (!subject) return;
     if (!viewKeys || viewKeys.length === 0) return;
@@ -608,7 +610,9 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
     link.href = frame.generatedImage;
     const resLabel = frame.resolution === '9:16' ? 'reel' : 'landscape';
     link.download = `storyboard-frame-${frame.id.slice(0, 8)}-${resLabel}.png`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   };
 
   // ── subject click ──────────────────────────────────────────

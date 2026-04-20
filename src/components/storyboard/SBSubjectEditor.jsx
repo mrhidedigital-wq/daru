@@ -245,10 +245,4 @@ const S = {
     lineHeight: 1.5,
   },
   hintText: { fontSize: 9, color: C.warning, fontFamily: 'monospace' },
-  applyBtn: {
-    background: C.accent, border: 'none', borderRadius: 6,
-    color: '#fff', padding: '11px', fontSize: 10, fontWeight: 700,
-    letterSpacing: '0.1em', fontFamily: 'monospace', width: '100%',
-    transition: 'opacity 0.2s', marginTop: 4,
-  },
 };
