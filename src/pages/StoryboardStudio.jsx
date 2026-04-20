@@ -120,6 +120,12 @@ const buildFramePrompt = (frame) => {
     ? `Add the following props naturally to the scene: ${props.join(', ')}.`
     : '';
 
+  const expressionLines = (subjects || []).map(s =>
+    s.expression
+      ? `"${s.label}": expression = ${s.expression}`
+      : `"${s.label}": keep original expression`
+  ).join('\n');
+
   return `
 ${styleInstruction}
 
@@ -140,6 +146,9 @@ IMPORTANT:
 - Do NOT change anything not mentioned above
 - Maintain exact composition and scene layout from reference
 - ${styleInstruction}
+
+FACIAL EXPRESSIONS (follow exactly):
+${expressionLines || 'Keep all expressions as in the reference image.'}
   `.trim();
 };
 
@@ -210,15 +219,10 @@ export default function StoryboardStudio() {
   // ── state helpers ──────────────────────────────────────────
 
   const updateFrame = useCallback((id, updates) => {
-    setFrames(prev => {
-      const match = prev.find(f => f.id === id);
-      if (!match) console.warn('[updateFrame] NO match para id:', id, '— frames ids:', prev.map(f => f.id));
-      return prev.map(f => f.id === id ? { ...f, ...updates } : f);
-    });
+    setFrames(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
   }, []);
 
   const updateSubject = useCallback((frameId, subjectId, updates) => {
-    console.log('[updateSubject] frameId:', frameId, 'subjectId:', subjectId, 'updates:', Object.keys(updates));
     setFrames(prev => prev.map(f => {
       if (f.id !== frameId) return f;
       return {
@@ -298,6 +302,7 @@ export default function StoryboardStudio() {
         costumeImage: null,
         keepCostume: true,
         customDescription: '',
+        expression: '',
         turnaround: { frontal: null, lateral_izq: null, lateral_der: null, perfil: null, espalda: null },
         selectedViews: ['frontal'],
       }));
@@ -368,6 +373,11 @@ Reframe this image:
 ${targetSubject ? `- Focus on: ${targetSubject}` : ''}
 Keep all characters, style, lighting, and scene content identical.
 Only change the framing and camera position.
+
+EXPRESSIONS & EMOTIONS:
+- Preserve the exact facial expression of every character as shown in the reference image.
+- If a character is smiling, keep the smile. If neutral, keep neutral.
+- Do NOT change any facial expression unless explicitly told to do so.
       `.trim();
 
       const result = await generateImageWithConversation(
@@ -406,6 +416,11 @@ Add the following prop to the image: ${newProp}
 ${targetSubject ? `Add it to/near: ${targetSubject}` : 'Add it naturally to the scene'}
 Keep all existing characters, style, lighting, background, and composition identical.
 Only add the new prop in a natural and contextually appropriate way.
+
+EXPRESSIONS & EMOTIONS:
+- Preserve the exact facial expression of every character as shown in the reference image.
+- If a character is smiling, keep the smile. If neutral, keep neutral.
+- Do NOT change any facial expression unless explicitly told to do so.
       `.trim();
 
       const result = await generateImageWithConversation(
@@ -493,17 +508,10 @@ Only add the new prop in a natural and contextually appropriate way.
   // ── subject changes ────────────────────────────────────────
 
   const applySubjectChanges = async () => {
-    console.log('[apply] INICIO — activeFrameId:', activeFrameId, 'activeSubjectId:', activeSubjectId);
     if (!activeFrameId || !activeSubjectId) return;
     const currentFrame = framesRef.current.find(f => f.id === activeFrameId);
     const currentSubject = currentFrame?.subjects?.find(s => s.id === activeSubjectId);
-    console.log('[apply] frame:', !!currentFrame, 'subject:', !!currentSubject);
     if (!currentFrame || !currentSubject) return;
-
-    console.log('[apply] faceImage:', currentSubject.faceImage ? 'TIENE (' + currentSubject.faceImage.length + ' chars)' : 'NULL');
-    console.log('[apply] costumeImage:', currentSubject.costumeImage ? 'TIENE' : 'NULL');
-    console.log('[apply] keepCostume:', currentSubject.keepCostume);
-    console.log('[apply] customDescription:', currentSubject.customDescription);
 
     const frame = currentFrame;
     const subject = currentSubject;
@@ -525,8 +533,6 @@ Only add the new prop in a natural and contextually appropriate way.
         (!subject.keepCostume && subject.costumeImage) ? subject.costumeImage : null,
       ].filter(Boolean);
 
-      console.log('[apply] refImages count:', refImages.length);
-
       const styleInstruction = frame.styleMode === 'animation'
         ? 'Maintain the exact animation/illustration style. Do NOT make it photorealistic.'
         : 'Maintain the exact visual style of the reference image.';
@@ -542,12 +548,15 @@ Match their position (${subject.position}), pose, and scale to fit naturally in 
 If the original shot only showed part of the body, show the same portion of the new character.`;
       } else {
         const faceInstr = hasFaceOnly
-          ? `REPLACE only the FACE of "${subject.label}" with the face in the SECOND reference image. Keep body, pose, position identical.`
+          ? `FACE SWAP: Take the face from the SECOND image and place it exactly on the body of "${subject.label}" in the FIRST image. Match the face angle, lighting, and skin tone to fit naturally. Keep the body, clothing, pose, and position 100% identical to the FIRST image. Only the face region changes — everything else stays the same.`
           : `Keep the face of "${subject.label}" exactly as in the original.`;
+        const expressionInstr = subject.expression
+          ? `FACIAL EXPRESSION for "${subject.label}": Change their expression to ${subject.expression}. Apply this expression naturally while respecting face shape and lighting.`
+          : `FACIAL EXPRESSION for "${subject.label}": Keep the exact same facial expression as shown in the reference. Do NOT change it.`;
         const costumeInstr = (!subject.keepCostume && subject.costumeImage)
           ? `REPLACE the costume of "${subject.label}" with the clothing in the THIRD reference image. Keep body shape and pose identical.`
           : `Keep the original costume of "${subject.label}" EXACTLY: ${subject.description}`;
-        characterInstruction = `CHARACTER TO MODIFY: "${subject.label}"\n${faceInstr}\n${costumeInstr}`;
+        characterInstruction = `CHARACTER TO MODIFY: "${subject.label}"\n${faceInstr}\n${expressionInstr}\n${costumeInstr}`;
       }
 
       const otherSubjects = frame.subjects
@@ -572,10 +581,7 @@ ${characterRef ? (hasTurnaround ? 'The SECOND image is the FULL BODY CHARACTER t
 ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW COSTUME to apply.' : ''}
       `.trim();
 
-      console.log('[apply] llamando generateImageWithGemini con', refImages.length, 'imágenes');
       const result = await generateImageWithGemini(prompt, refImages, frame.resolution || '16:9');
-      console.log('[apply] ÉXITO — imagen generada, length:', result?.length);
-      console.log('[apply] updateFrame llamado con status done, frameId:', activeFrameId);
 
       updateFrame(activeFrameId, {
         generatedImage: result,
@@ -589,7 +595,6 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
 
       setLeftTab('personajes');
     } catch (err) {
-      console.log('[apply] ERROR:', err.message);
       updateFrame(activeFrameId, { status: 'error', errorMsg: friendlyError(err) });
     }
   };

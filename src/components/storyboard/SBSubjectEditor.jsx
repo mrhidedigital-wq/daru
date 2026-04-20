@@ -1,5 +1,17 @@
 import React, { useRef } from 'react';
 import { C } from '../../services/assetUtils';
+
+const EXPRESSIONS = [
+  { value: '',          label: 'ORIGINAL',       emoji: '🔒' },
+  { value: 'smiling',   label: 'SONRIENDO',      emoji: '😊' },
+  { value: 'serious',   label: 'SERIO/A',         emoji: '😐' },
+  { value: 'laughing',  label: 'RIENDO',          emoji: '😄' },
+  { value: 'sad',       label: 'TRISTE',          emoji: '😔' },
+  { value: 'surprised', label: 'SORPRENDIDO/A',   emoji: '😮' },
+  { value: 'angry',     label: 'ENOJADO/A',       emoji: '😠' },
+  { value: 'thinking',  label: 'PENSATIVO/A',     emoji: '🤔' },
+  { value: 'confident', label: 'SEGURO/A',        emoji: '😎' },
+];
 import SBTurnaround from './SBTurnaround';
 import { ACCEPTED } from '../studio/frameUploaderConfig';
 
@@ -24,8 +36,6 @@ export default function SBSubjectEditor({ subject, onUpdate, onGenerateTurnaroun
 
   const handleFaceFile = async (file) => {
     const b64 = await fileToBase64(file);
-    console.log('[faceFile] b64 length:', b64?.length);
-    console.log('[faceFile] llamando onUpdate con faceImage');
     onUpdate({ faceImage: b64 });
   };
 
@@ -79,6 +89,35 @@ export default function SBSubjectEditor({ subject, onUpdate, onGenerateTurnaroun
         )}
         <input ref={faceInputRef} type="file" accept={ACCEPTED} style={{ display: 'none' }}
           onChange={e => { const f = e.target.files?.[0]; if (f) handleFaceFile(f); e.target.value = ''; }} />
+      </div>
+
+      {/* Expresión */}
+      <div style={S.section}>
+        <div style={S.label}>EXPRESIÓN</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+          {EXPRESSIONS.map(exp => (
+            <button
+              key={exp.value}
+              onClick={() => onUpdate({ expression: exp.value })}
+              style={{
+                background: subject.expression === exp.value ? `${C.accent}20` : C.card,
+                border: `1px solid ${subject.expression === exp.value ? C.accent : C.border}`,
+                borderRadius: 4,
+                color: subject.expression === exp.value ? C.accent : C.muted,
+                padding: '5px 4px',
+                fontSize: 9,
+                cursor: 'pointer',
+                fontFamily: 'monospace',
+                letterSpacing: '0.04em',
+                textAlign: 'center',
+                lineHeight: 1.4,
+              }}
+            >
+              <div style={{ fontSize: 14 }}>{exp.emoji}</div>
+              <div>{exp.label}</div>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Vestuario */}
@@ -154,7 +193,7 @@ export default function SBSubjectEditor({ subject, onUpdate, onGenerateTurnaroun
         }}
         onClick={onApplyChanges}
       >
-        🔥 APLICAR CAMBIOS AL FRAME 🔥
+        APLICAR CAMBIOS AL FRAME
       </button>
 
       {/* Turnaround */}
