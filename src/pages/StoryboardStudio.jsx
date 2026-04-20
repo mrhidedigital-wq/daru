@@ -414,34 +414,49 @@ Only add the new prop in a natural and contextually appropriate way.
     const frame = frames.find(f => f.id === activeFrameId);
     const subject = frame?.subjects?.find(s => s.id === subjectId);
     if (!subject) return;
+    if (!viewKeys || viewKeys.length === 0) return;
 
     setGeneratingViews(prev => ({ ...prev, [subjectId]: true }));
+
+    // Use best available image for character reference
+    const baseImage = frame.referenceImage || frame.generatedImage;
+
     try {
-      // Build ref images once — use local accumulator to avoid stale closure
       const refImages = [
-        frame.referenceImage,
+        baseImage,
         subject.faceImage,
         ...Object.values(subject.turnaround).filter(Boolean),
       ].filter(Boolean);
 
-      // Track turnaround locally so each iteration uses the latest generated views
       const accumulatedTurnaround = { ...subject.turnaround };
+      let lastError = null;
 
       for (const viewKey of viewKeys) {
         try {
           const prompt = buildTurnaroundPrompt(subject, viewKey);
           const result = await generateImageWithGemini(prompt, refImages, '1:1');
-          // Accumulate locally
           accumulatedTurnaround[viewKey] = result;
           refImages.push(result);
-          // Write to state with the fully accumulated object so no view is lost
           updateSubject(activeFrameId, subjectId, {
             turnaround: { ...accumulatedTurnaround },
           });
-        } catch (_) {
-          // continue with other views on error
+        } catch (err) {
+          console.error(`[Turnaround] Error generando vista "${viewKey}":`, err);
+          lastError = err;
         }
       }
+
+      // Surface error if ALL views failed
+      const anyGenerated = viewKeys.some(k => accumulatedTurnaround[k]);
+      if (!anyGenerated && lastError) {
+        updateFrame(activeFrameId, {
+          status: 'error',
+          errorMsg: `No se pudo generar las vistas: ${friendlyError(lastError)}`,
+        });
+      }
+    } catch (err) {
+      console.error('[Turnaround] Error inesperado:', err);
+      updateFrame(activeFrameId, { status: 'error', errorMsg: friendlyError(err) });
     } finally {
       setGeneratingViews(prev => ({ ...prev, [subjectId]: false }));
     }
@@ -567,6 +582,28 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
     }
 
     if (activeFrame.status === 'analyzed') {
+      // If user selected a subject to edit, show the subject editor even before generating
+      if (activeSubjectId) {
+        const activeSubject = activeFrame.subjects?.find(s => s.id === activeSubjectId);
+        if (activeSubject) {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button style={S.backBtn} onClick={() => setActiveSubjectId(null)}>
+                ← VOLVER AL ANÁLISIS
+              </button>
+              <div style={{ marginTop: 10 }}>
+                <SBSubjectEditor
+                  subject={activeSubject}
+                  onUpdate={(updates) => updateSubject(activeFrameId, activeSubjectId, updates)}
+                  onGenerateTurnaround={(subId, views) => generateTurnaround(subId, views)}
+                  onApplyChanges={applySubjectChanges}
+                  generatingViews={generatingViews[activeSubjectId] || false}
+                />
+              </div>
+            </div>
+          );
+        }
+      }
       if (activeFrame.analysis?.error) {
         return (
           <div style={{ padding: '0 2px' }}>
