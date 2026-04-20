@@ -165,10 +165,18 @@ export async function urlToInlineData(url) {
 export async function generateImageWithGemini(prompt, refImages = [], aspectRatio = '16:9') {
   const endpoint = '/api/llm';
 
+  // ── Comprimir referencias antes de enviar (evita 413) ─────────
+  // maxPx=768 mantiene suficiente detalle para identity reference
+  const compressedRefs = await Promise.all(
+    refImages.filter(Boolean).map(url =>
+      url.startsWith('data:') ? compressBase64Image(url, 768, 0.70) : Promise.resolve(url)
+    )
+  );
+
   // ── Orden: imágenes primero, texto al final (Google docs) ─────
   const userParts = [];
   const inlineImages = await Promise.all(
-    refImages.filter(Boolean).map(url => urlToInlineData(url))
+    compressedRefs.filter(Boolean).map(url => urlToInlineData(url))
   );
   for (const img of inlineImages.filter(Boolean)) {
     userParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
@@ -215,8 +223,12 @@ export async function generateImageWithGemini(prompt, refImages = [], aspectRati
 export async function generateImageWithConversation(frontalPrompt, frontalImage, editPrompt, aspectRatio = '16:9') {
   const endpoint = '/api/llm';
 
-  // Convertir la imagen frontal a inline data
-  const frontalInline = await urlToInlineData(frontalImage);
+  // Comprimir antes de enviar (evita 413)
+  const compressedFrontal = frontalImage?.startsWith('data:')
+    ? await compressBase64Image(frontalImage, 768, 0.70)
+    : frontalImage;
+
+  const frontalInline = await urlToInlineData(compressedFrontal);
   if (!frontalInline) throw new Error('No se pudo leer la imagen frontal');
 
   const body = {
