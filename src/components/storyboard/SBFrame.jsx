@@ -119,6 +119,18 @@ export default function SBFrame({ frame, index, isActive, onActivate, onFileUplo
             <div style={{ color: C.error, fontSize: 10, fontFamily: 'monospace', textAlign: 'center' }}>
               ⚠ {errorMsg || 'Error al procesar'}
             </div>
+            <div style={{ position: 'absolute', bottom: 8, left: 8, right: 8, display: 'flex', gap: 6 }}>
+              <button
+                onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}
+                style={{
+                  flex: 1, background: C.card, border: `1px solid ${C.warning}`,
+                  borderRadius: 4, color: C.warning, padding: '6px', fontSize: 9,
+                  fontFamily: 'monospace', cursor: 'pointer', letterSpacing: '0.06em',
+                }}
+              >
+                ↑ REEMPLAZAR IMAGEN
+              </button>
+            </div>
           </div>
         )}
       </div>

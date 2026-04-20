@@ -503,20 +503,63 @@ Only add the new prop in a natural and contextually appropriate way.
 
   // ── subject changes ────────────────────────────────────────
 
-  const [applyingSubject, setApplyingSubject] = useState({});
-
-  const applySubjectChanges = async (frameId, subjectId) => {
-    const frame = frames.find(f => f.id === frameId);
-    const subject = frame?.subjects?.find(s => s.id === subjectId);
+  const applySubjectChanges = async () => {
+    if (!activeFrameId || !activeSubjectId) return;
+    const frame = frames.find(f => f.id === activeFrameId);
+    const subject = frame?.subjects?.find(s => s.id === activeSubjectId);
     if (!frame || !subject) return;
 
-    setApplyingSubject(prev => ({ ...prev, [subjectId]: true }));
-    updateFrame(frameId, { status: 'generating' });
+    updateFrame(activeFrameId, { status: 'generating' });
+
     try {
-      const { prompt, refImages } = buildSubjectChangesPrompt(frame, subject);
+      const refImages = [
+        frame.referenceImage,
+        subject.faceImage || null,
+        (!subject.keepCostume && subject.costumeImage) ? subject.costumeImage : null,
+      ].filter(Boolean);
+
+      const styleInstruction = frame.styleMode === 'animation'
+        ? 'Maintain the exact animation/illustration style. Do NOT make it photorealistic.'
+        : 'Maintain the exact visual style of the reference image.';
+
+      let characterInstruction = '';
+      if (subject.customDescription?.trim()) {
+        characterInstruction = `REPLACE the character "${subject.label}" completely with: ${subject.customDescription}. Keep their position in the scene (${subject.position}).`;
+      } else {
+        const faceInstr = subject.faceImage
+          ? `REPLACE only the FACE of "${subject.label}" with the face shown in the SECOND reference image. Keep body, pose, position identical.`
+          : `Keep the face of "${subject.label}" exactly as in the original.`;
+        const costumeInstr = (!subject.keepCostume && subject.costumeImage)
+          ? `REPLACE the costume of "${subject.label}" with the clothing in the THIRD reference image. Keep body shape and pose identical.`
+          : `Keep the original costume of "${subject.label}" EXACTLY: ${subject.description}`;
+        characterInstruction = `CHARACTER TO MODIFY: "${subject.label}"\n${faceInstr}\n${costumeInstr}`;
+      }
+
+      const otherSubjects = frame.subjects
+        .filter(s => s.id !== subject.id)
+        .map(s => `Keep character "${s.label}" EXACTLY as in the original. DO NOT change them.`)
+        .join('\n');
+
+      const prompt = `
+${styleInstruction}
+
+TASK: Modify one character in this scene while keeping everything else identical.
+
+${characterInstruction}
+
+OTHER CHARACTERS (DO NOT TOUCH):
+${otherSubjects || 'No other characters.'}
+
+KEEP IDENTICAL: background, lighting, composition, shot type, all props, visual style.
+
+The FIRST image is the scene reference (base composition).
+${subject.faceImage ? 'The SECOND image is the NEW FACE to apply.' : ''}
+${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW COSTUME to apply.' : ''}
+      `.trim();
+
       const result = await generateImageWithGemini(prompt, refImages, frame.resolution || '16:9');
 
-      updateFrame(frameId, {
+      updateFrame(activeFrameId, {
         generatedImage: result,
         status: 'done',
         conversationHistory: [
@@ -525,9 +568,7 @@ Only add the new prop in a natural and contextually appropriate way.
         ],
       });
     } catch (err) {
-      updateFrame(frameId, { status: 'error', errorMsg: friendlyError(err) });
-    } finally {
-      setApplyingSubject(prev => ({ ...prev, [subjectId]: false }));
+      updateFrame(activeFrameId, { status: 'error', errorMsg: friendlyError(err) });
     }
   };
 
@@ -663,8 +704,7 @@ Only add the new prop in a natural and contextually appropriate way.
                       subject={activeSubject}
                       onUpdate={(updates) => updateSubject(activeFrameId, activeSubjectId, updates)}
                       onGenerateTurnaround={(subId, views) => generateTurnaround(subId, views)}
-                      onApplyChanges={() => applySubjectChanges(activeFrameId, activeSubjectId)}
-                      applyingChanges={applyingSubject[activeSubjectId] || false}
+                      onApplyChanges={applySubjectChanges}
                       generatingViews={generatingViews[activeSubjectId] || false}
                     />
                   </div>
