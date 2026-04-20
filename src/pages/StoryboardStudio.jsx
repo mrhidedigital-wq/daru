@@ -417,22 +417,27 @@ Only add the new prop in a natural and contextually appropriate way.
 
     setGeneratingViews(prev => ({ ...prev, [subjectId]: true }));
     try {
+      // Build ref images once — use local accumulator to avoid stale closure
       const refImages = [
         frame.referenceImage,
         subject.faceImage,
         ...Object.values(subject.turnaround).filter(Boolean),
       ].filter(Boolean);
 
+      // Track turnaround locally so each iteration uses the latest generated views
+      const accumulatedTurnaround = { ...subject.turnaround };
+
       for (const viewKey of viewKeys) {
         try {
           const prompt = buildTurnaroundPrompt(subject, viewKey);
           const result = await generateImageWithGemini(prompt, refImages, '1:1');
+          // Accumulate locally
+          accumulatedTurnaround[viewKey] = result;
+          refImages.push(result);
+          // Write to state with the fully accumulated object so no view is lost
           updateSubject(activeFrameId, subjectId, {
-            turnaround: { ...subject.turnaround, [viewKey]: result },
+            turnaround: { ...accumulatedTurnaround },
           });
-          // refresh subject reference for next iteration
-          const updated = frames.find(f => f.id === activeFrameId)?.subjects?.find(s => s.id === subjectId);
-          if (updated) refImages.push(result);
         } catch (_) {
           // continue with other views on error
         }
@@ -453,8 +458,12 @@ Only add the new prop in a natural and contextually appropriate way.
     updateFrame(activeFrameId, { status: 'generating' });
 
     try {
+      // Use generatedImage as base if available — it reflects the current composition.
+      // Fall back to referenceImage if the frame hasn't been generated yet.
+      const baseImage = frame.generatedImage || frame.referenceImage;
+
       const refImages = [
-        frame.referenceImage,
+        baseImage,
         subject.faceImage || null,
         (!subject.keepCostume && subject.costumeImage) ? subject.costumeImage : null,
       ].filter(Boolean);
