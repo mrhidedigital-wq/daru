@@ -10,7 +10,7 @@ const fileToBase64 = file => new Promise((resolve, reject) => {
   r.readAsDataURL(file);
 });
 
-export default function SBSubjectEditor({ subject, onUpdate, onGenerateTurnaround, generatingViews }) {
+export default function SBSubjectEditor({ subject, onUpdate, onGenerateTurnaround, onApplyChanges, applyingChanges, generatingViews }) {
   const faceInputRef = useRef();
   const costumeInputRef = useRef();
 
@@ -142,6 +142,19 @@ export default function SBSubjectEditor({ subject, onUpdate, onGenerateTurnaroun
         )}
       </div>
 
+      {/* Aplicar cambios */}
+      <button
+        onClick={onApplyChanges}
+        disabled={applyingChanges}
+        style={{
+          ...S.applyBtn,
+          opacity: applyingChanges ? 0.5 : 1,
+          cursor: applyingChanges ? 'default' : 'pointer',
+        }}
+      >
+        {applyingChanges ? '⟳ APLICANDO CAMBIOS...' : '▶ APLICAR CAMBIOS AL FRAME'}
+      </button>
+
       {/* Turnaround */}
       <SBTurnaround
         subject={subject}
@@ -191,4 +204,10 @@ const S = {
     lineHeight: 1.5,
   },
   hintText: { fontSize: 9, color: C.warning, fontFamily: 'monospace' },
+  applyBtn: {
+    background: C.accent, border: 'none', borderRadius: 6,
+    color: '#fff', padding: '11px', fontSize: 10, fontWeight: 700,
+    letterSpacing: '0.1em', fontFamily: 'monospace', width: '100%',
+    transition: 'opacity 0.2s', marginTop: 4,
+  },
 };
