@@ -214,6 +214,7 @@ export default function StoryboardStudio() {
   }, []);
 
   const updateSubject = useCallback((frameId, subjectId, updates) => {
+    console.log('[updateSubject] frameId:', frameId, 'subjectId:', subjectId, 'updates:', Object.keys(updates));
     setFrames(prev => prev.map(f => {
       if (f.id !== frameId) return f;
       return {
@@ -488,11 +489,20 @@ Only add the new prop in a natural and contextually appropriate way.
   // ── subject changes ────────────────────────────────────────
 
   const applySubjectChanges = async () => {
-    alert('applySubjectChanges ejecutado');
+    console.log('[apply] INICIO — activeFrameId:', activeFrameId, 'activeSubjectId:', activeSubjectId);
     if (!activeFrameId || !activeSubjectId) return;
-    const frame = framesRef.current.find(f => f.id === activeFrameId);
-    const subject = frame?.subjects?.find(s => s.id === activeSubjectId);
-    if (!frame || !subject) return;
+    const currentFrame = framesRef.current.find(f => f.id === activeFrameId);
+    const currentSubject = currentFrame?.subjects?.find(s => s.id === activeSubjectId);
+    console.log('[apply] frame:', !!currentFrame, 'subject:', !!currentSubject);
+    if (!currentFrame || !currentSubject) return;
+
+    console.log('[apply] faceImage:', currentSubject.faceImage ? 'TIENE (' + currentSubject.faceImage.length + ' chars)' : 'NULL');
+    console.log('[apply] costumeImage:', currentSubject.costumeImage ? 'TIENE' : 'NULL');
+    console.log('[apply] keepCostume:', currentSubject.keepCostume);
+    console.log('[apply] customDescription:', currentSubject.customDescription);
+
+    const frame = currentFrame;
+    const subject = currentSubject;
 
     updateFrame(activeFrameId, { status: 'generating' });
 
@@ -510,6 +520,8 @@ Only add the new prop in a natural and contextually appropriate way.
         characterRef,
         (!subject.keepCostume && subject.costumeImage) ? subject.costumeImage : null,
       ].filter(Boolean);
+
+      console.log('[apply] refImages count:', refImages.length);
 
       const styleInstruction = frame.styleMode === 'animation'
         ? 'Maintain the exact animation/illustration style. Do NOT make it photorealistic.'
@@ -556,7 +568,9 @@ ${characterRef ? (hasTurnaround ? 'The SECOND image is the FULL BODY CHARACTER t
 ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW COSTUME to apply.' : ''}
       `.trim();
 
+      console.log('[apply] llamando generateImageWithGemini con', refImages.length, 'imágenes');
       const result = await generateImageWithGemini(prompt, refImages, frame.resolution || '16:9');
+      console.log('[apply] ÉXITO — imagen generada, length:', result?.length);
 
       updateFrame(activeFrameId, {
         generatedImage: result,
@@ -569,6 +583,7 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
 
       setLeftTab('personajes');
     } catch (err) {
+      console.log('[apply] ERROR:', err.message);
       updateFrame(activeFrameId, { status: 'error', errorMsg: friendlyError(err) });
     }
   };

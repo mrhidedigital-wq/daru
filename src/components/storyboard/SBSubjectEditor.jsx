@@ -24,6 +24,8 @@ export default function SBSubjectEditor({ subject, onUpdate, onGenerateTurnaroun
 
   const handleFaceFile = async (file) => {
     const b64 = await fileToBase64(file);
+    console.log('[faceFile] b64 length:', b64?.length);
+    console.log('[faceFile] llamando onUpdate con faceImage');
     onUpdate({ faceImage: b64 });
   };
 
