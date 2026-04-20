@@ -152,8 +152,6 @@ const buildTurnaroundPrompt = (subject, viewKey, hasFaceImage) => {
     espalda:     "BACK VIEW — subject facing away from camera, full body head to toe",
   };
 
-  const characterDesc = subject.customDescription?.trim() || subject.description || '';
-
   const faceInstruction = hasFaceImage
     ? `FACE: Use the face from the FIRST reference image as the character's face. Apply it exactly — same person, same features.`
     : `FACE: Maintain the face consistent with the character description.`;
