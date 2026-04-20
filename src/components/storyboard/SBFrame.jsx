@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { C } from '../../services/assetUtils';
 import { ACCEPTED } from '../studio/frameUploaderConfig';
 
@@ -13,6 +13,8 @@ const STATUS_LABELS = {
 
 export default function SBFrame({ frame, index, isActive, onActivate, onFileUpload, onDownload, onDelete }) {
   const inputRef = useRef();
+  const [showRef, setShowRef] = useState(false);
+
   const { status, referenceImage, generatedImage, errorMsg, resolution } = frame;
   const isLandscape = (resolution || '16:9') === '16:9';
   const st = STATUS_LABELS[status] || STATUS_LABELS.empty;
@@ -28,6 +30,13 @@ export default function SBFrame({ frame, index, isActive, onActivate, onFileUplo
     const file = e.dataTransfer.files?.[0];
     if (file) onFileUpload(frame.id, file);
   };
+
+  // Background shown under the generating overlay:
+  // prefer current generatedImage (user sees what's being modified), fallback to referenceImage
+  const generatingBg = generatedImage || referenceImage;
+
+  // Image shown in done state respects the REF/GEN toggle
+  const displayImage = showRef ? referenceImage : generatedImage;
 
   return (
     <div
@@ -84,16 +93,26 @@ export default function SBFrame({ frame, index, isActive, onActivate, onFileUplo
           </div>
         )}
 
-        {(status === 'analyzing' || status === 'generating') && (
+        {status === 'analyzing' && (
           <>
             {referenceImage && (
               <img src={referenceImage} alt="referencia" style={S.bgImg} />
             )}
             <div style={S.overlay}>
               <div style={S.spinner}>⟳</div>
-              <div style={S.overlayLabel}>
-                {status === 'analyzing' ? 'Analizando…' : 'Generando…'}
-              </div>
+              <div style={S.overlayLabel}>Analizando…</div>
+            </div>
+          </>
+        )}
+
+        {status === 'generating' && (
+          <>
+            {generatingBg && (
+              <img src={generatingBg} alt="base" style={S.bgImg} />
+            )}
+            <div style={S.overlay}>
+              <div style={S.spinner}>⟳</div>
+              <div style={S.overlayLabel}>Aplicando cambios…</div>
             </div>
           </>
         )}
@@ -110,8 +129,8 @@ export default function SBFrame({ frame, index, isActive, onActivate, onFileUplo
           </>
         )}
 
-        {status === 'done' && generatedImage && (
-          <img src={generatedImage} alt={`frame ${index + 1}`} style={S.bgImg} />
+        {status === 'done' && displayImage && (
+          <img src={displayImage} alt={`frame ${index + 1}`} style={S.bgImg} />
         )}
 
         {status === 'error' && (
@@ -138,11 +157,27 @@ export default function SBFrame({ frame, index, isActive, onActivate, onFileUplo
       {/* Footer */}
       {(status === 'done' || status === 'analyzed') && referenceImage && (
         <div style={S.footer}>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            {referenceImage && (
-              <img src={referenceImage} alt="ref" style={S.refThumb} />
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <img
+              src={showRef ? referenceImage : (generatedImage || referenceImage)}
+              alt="preview"
+              style={S.refThumb}
+            />
+            {status === 'done' && generatedImage && (
+              <button
+                onClick={e => { e.stopPropagation(); setShowRef(v => !v); }}
+                style={{
+                  ...S.toggleBtn,
+                  color: showRef ? C.warning : C.accent,
+                  borderColor: showRef ? C.warning : C.accent,
+                }}
+              >
+                {showRef ? 'GEN' : 'REF'}
+              </button>
             )}
-            <span style={{ fontSize: 8, color: C.dim, fontFamily: 'monospace' }}>REF</span>
+            {!(status === 'done' && generatedImage) && (
+              <span style={{ fontSize: 8, color: C.dim, fontFamily: 'monospace' }}>REF</span>
+            )}
           </div>
           {status === 'done' && (
             <button
@@ -222,6 +257,11 @@ const S = {
     background: C.panel,
   },
   refThumb: { width: 20, height: 14, objectFit: 'cover', borderRadius: 2, border: `1px solid ${C.border}` },
+  toggleBtn: {
+    background: 'transparent', border: `1px solid`, borderRadius: 3,
+    padding: '2px 6px', fontSize: 8, cursor: 'pointer',
+    fontFamily: 'monospace', letterSpacing: '0.06em',
+  },
   downloadBtn: {
     background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 3,
     color: C.muted, padding: '3px 8px', fontSize: 8, cursor: 'pointer',
