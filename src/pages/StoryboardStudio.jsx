@@ -152,6 +152,7 @@ const buildTurnaroundPrompt = (subject, viewKey, hasFaceImage) => {
     espalda:     "BACK VIEW — subject facing away from camera, full body head to toe",
   };
 
+  const characterDesc = subject.customDescription?.trim() || subject.description || '';
 
   const faceInstruction = hasFaceImage
     ? `FACE: Use the face from the FIRST reference image as the character's face. Apply it exactly — same person, same features.`
@@ -488,13 +489,17 @@ Only add the new prop in a natural and contextually appropriate way.
     updateFrame(activeFrameId, { status: 'generating' });
 
     try {
-      // Use generatedImage as base if available — it reflects the current composition.
-      // Fall back to referenceImage if the frame hasn't been generated yet.
       const baseImage = frame.generatedImage || frame.referenceImage;
+
+      // Priority: turnaround frontal > faceImage > nothing
+      const turnaroundFrontal = subject.turnaround?.frontal || null;
+      const characterRef = turnaroundFrontal || subject.faceImage || null;
+      const hasTurnaround = !!turnaroundFrontal;
+      const hasFaceOnly = !turnaroundFrontal && !!subject.faceImage;
 
       const refImages = [
         baseImage,
-        subject.faceImage || null,
+        characterRef,
         (!subject.keepCostume && subject.costumeImage) ? subject.costumeImage : null,
       ].filter(Boolean);
 
@@ -505,9 +510,15 @@ Only add the new prop in a natural and contextually appropriate way.
       let characterInstruction = '';
       if (subject.customDescription?.trim()) {
         characterInstruction = `REPLACE the character "${subject.label}" completely with: ${subject.customDescription}. Keep their position in the scene (${subject.position}).`;
+      } else if (hasTurnaround) {
+        characterInstruction = `CHARACTER TO REPLACE: "${subject.label}"
+REPLACE this character in the scene with the character shown in the SECOND reference image.
+The SECOND image is a full-body frontal character sheet — use it as the exact appearance of the new character.
+Match their position (${subject.position}), pose, and scale to fit naturally in the scene.
+If the original shot only showed part of the body, show the same portion of the new character.`;
       } else {
-        const faceInstr = subject.faceImage
-          ? `REPLACE only the FACE of "${subject.label}" with the face shown in the SECOND reference image. Keep body, pose, position identical.`
+        const faceInstr = hasFaceOnly
+          ? `REPLACE only the FACE of "${subject.label}" with the face in the SECOND reference image. Keep body, pose, position identical.`
           : `Keep the face of "${subject.label}" exactly as in the original.`;
         const costumeInstr = (!subject.keepCostume && subject.costumeImage)
           ? `REPLACE the costume of "${subject.label}" with the clothing in the THIRD reference image. Keep body shape and pose identical.`
@@ -532,8 +543,8 @@ ${otherSubjects || 'No other characters.'}
 
 KEEP IDENTICAL: background, lighting, composition, shot type, all props, visual style.
 
-The FIRST image is the scene reference (base composition).
-${subject.faceImage ? 'The SECOND image is the NEW FACE to apply.' : ''}
+The FIRST image is the current scene (base composition).
+${characterRef ? (hasTurnaround ? 'The SECOND image is the FULL BODY CHARACTER to insert into the scene.' : 'The SECOND image is the NEW FACE to apply.') : ''}
 ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW COSTUME to apply.' : ''}
       `.trim();
 
@@ -547,6 +558,8 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
           { role: 'model', parts: [{ inlineData: { mimeType: 'image/jpeg', data: result.split(',')[1] } }] },
         ],
       });
+
+      setLeftTab('personajes');
     } catch (err) {
       updateFrame(activeFrameId, { status: 'error', errorMsg: friendlyError(err) });
     }
