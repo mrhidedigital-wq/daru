@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { C } from '../../services/assetUtils';
 import { ACCEPTED } from '../studio/frameUploaderConfig';
 

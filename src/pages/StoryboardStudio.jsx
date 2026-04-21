@@ -527,7 +527,10 @@ EXPRESSIONS & EMOTIONS:
     updateFrame(activeFrameId, { status: 'generating' });
 
     try {
-      const baseImage = frame.generatedImage || frame.referenceImage;
+      // sceneBase: current state of the scene (may be a previously modified image)
+      // identityAnchor: always the original upload — used to keep other characters stable
+      const sceneBase = frame.generatedImage || frame.referenceImage;
+      const identityAnchor = frame.referenceImage;
 
       // Priority: turnaround frontal > faceImage > nothing
       const turnaroundFrontal = subject.turnaround?.frontal || null;
@@ -536,10 +539,22 @@ EXPRESSIONS & EMOTIONS:
       const hasFaceOnly = !turnaroundFrontal && !!subject.faceImage;
 
       const refImages = [
-        baseImage,
+        sceneBase,
         characterRef,
         (!subject.keepCostume && subject.costumeImage) ? subject.costumeImage : null,
+        identityAnchor !== sceneBase ? identityAnchor : null,
       ].filter(Boolean);
+
+      console.log('[SB:apply] ═══════════════════════════════════════════');
+      console.log('[SB:apply] Frame:', frame.id.slice(0, 8));
+      console.log('[SB:apply] Subject:', subject.label);
+      console.log('[SB:apply] Input config:');
+      console.log('  - faceImage:', subject.faceImage ? `✓ (${subject.faceImage.length} chars)` : '✗');
+      console.log('  - expression:', subject.expression || '(keep original)');
+      console.log('  - keepCostume:', subject.keepCostume);
+      console.log('  - costumeImage:', subject.costumeImage ? '✓' : '✗');
+      console.log('  - customDescription:', subject.customDescription || '(none)');
+      console.log('  - turnaroundFrontal:', turnaroundFrontal ? '✓' : '✗');
 
       const styleInstruction = frame.styleMode === 'animation'
         ? 'Maintain the exact animation/illustration style. Do NOT make it photorealistic.'
@@ -547,30 +562,70 @@ EXPRESSIONS & EMOTIONS:
 
       let characterInstruction = '';
       if (subject.customDescription?.trim()) {
-        characterInstruction = `REPLACE the character "${subject.label}" completely with: ${subject.customDescription}. Keep their position in the scene (${subject.position}).`;
+        characterInstruction = `
+REPLACE the character "${subject.label}" ENTIRELY with a new character described as:
+${subject.customDescription}
+
+Keep their position in the scene: ${subject.position}.
+Keep the same pose and scale that "${subject.label}" had in the original scene.
+`.trim();
       } else if (hasTurnaround) {
-        characterInstruction = `CHARACTER TO REPLACE: "${subject.label}"
-REPLACE this character in the scene with the character shown in the SECOND reference image.
-The SECOND image is a full-body frontal character sheet — use it as the exact appearance of the new character.
-Match their position (${subject.position}), pose, and scale to fit naturally in the scene.
-If the original shot only showed part of the body, show the same portion of the new character.`;
+        characterInstruction = `
+CHARACTER REPLACEMENT — "${subject.label}":
+The SECOND image shows the NEW character (full body reference).
+Replace "${subject.label}" in the scene with this new character.
+- Keep the same position: ${subject.position}
+- Keep the same pose and scale as in the original
+- Match scene lighting and perspective
+`.trim();
       } else {
         const faceInstr = hasFaceOnly
-          ? `FACE SWAP: Take the face from the SECOND image and place it exactly on the body of "${subject.label}" in the FIRST image. Match the face angle, lighting, and skin tone to fit naturally. Keep the body, clothing, pose, and position 100% identical to the FIRST image. Only the face region changes — everything else stays the same.`
-          : `Keep the face of "${subject.label}" exactly as in the original.`;
+          ? `
+FACE REPLACEMENT — "${subject.label}":
+- Take the face from the SECOND image and apply it to "${subject.label}"
+- The new face must match: head angle, lighting, skin tone of the scene
+- DO NOT change: body, hair style (unless the face image shows different hair), pose, position, clothing
+- This is a surgical face swap, not a full character change
+          `.trim()
+          : `Keep the face of "${subject.label}" exactly as in the reference image.`;
+
         const expressionInstr = subject.expression
-          ? `FACIAL EXPRESSION for "${subject.label}": Change their expression to ${subject.expression}. Apply this expression naturally while respecting face shape and lighting.`
-          : `FACIAL EXPRESSION for "${subject.label}": Keep the exact same facial expression as shown in the reference. Do NOT change it.`;
+          ? `
+EXPRESSION CHANGE — "${subject.label}":
+Change the facial expression to: ${subject.expression}
+Apply naturally — adjust mouth, eyes, eyebrows consistent with this emotion.
+Keep the face identity intact.
+          `.trim()
+          : `Keep the exact facial expression of "${subject.label}" as in the reference.`;
+
         const costumeInstr = (!subject.keepCostume && subject.costumeImage)
-          ? `REPLACE the costume of "${subject.label}" with the clothing in the THIRD reference image. Keep body shape and pose identical.`
-          : `Keep the original costume of "${subject.label}" EXACTLY: ${subject.description}`;
-        characterInstruction = `CHARACTER TO MODIFY: "${subject.label}"\n${faceInstr}\n${expressionInstr}\n${costumeInstr}`;
+          ? `
+COSTUME REPLACEMENT — "${subject.label}":
+The THIRD image shows the new costume.
+Replace the clothing of "${subject.label}" with this costume.
+Keep body shape, pose, and position identical.
+          `.trim()
+          : `Keep the original costume of "${subject.label}" exactly: ${subject.description}`;
+
+        characterInstruction = `
+CHARACTER TO MODIFY: "${subject.label}"
+
+${faceInstr}
+
+${expressionInstr}
+
+${costumeInstr}
+        `.trim();
       }
 
       const otherSubjects = frame.subjects
         .filter(s => s.id !== subject.id)
         .map(s => `Keep character "${s.label}" EXACTLY as in the original. DO NOT change them.`)
         .join('\n');
+
+      const anchorNote = identityAnchor !== sceneBase
+        ? 'The LAST image is the ORIGINAL reference — use it to keep other characters identical to the original.'
+        : '';
 
       const prompt = `
 ${styleInstruction}
@@ -587,9 +642,22 @@ KEEP IDENTICAL: background, lighting, composition, shot type, all props, visual 
 The FIRST image is the current scene (base composition).
 ${characterRef ? (hasTurnaround ? 'The SECOND image is the FULL BODY CHARACTER to insert into the scene.' : 'The SECOND image is the NEW FACE to apply.') : ''}
 ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW COSTUME to apply.' : ''}
+${anchorNote}
       `.trim();
 
+      console.log('[SB:apply] refImages going to Gemini:', refImages.length);
+      console.log('[SB:apply] Mode:',
+        subject.customDescription?.trim() ? 'CUSTOM_DESCRIPTION' :
+        hasTurnaround ? 'FULL_BODY_TURNAROUND' :
+        hasFaceOnly ? 'FACE_SWAP' :
+        'EXPRESSION_ONLY'
+      );
+      console.log('[SB:apply] Prompt (first 300 chars):', prompt.slice(0, 300));
+
       const result = await generateImageWithGemini(prompt, refImages, frame.resolution || '16:9');
+
+      console.log('[SB:apply] ✓ Image generated, length:', result?.length);
+      console.log('[SB:apply] ═══════════════════════════════════════════');
 
       updateFrame(activeFrameId, {
         generatedImage: result,
@@ -607,6 +675,8 @@ ${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW C
       setLeftTab('personajes');
       setActiveSubjectId(null);
     } catch (err) {
+      console.log('[SB:apply] ✗ ERROR:', err.message);
+      console.log('[SB:apply] ═══════════════════════════════════════════');
       updateFrame(activeFrameId, { status: 'error', errorMsg: friendlyError(err) });
     }
   };
