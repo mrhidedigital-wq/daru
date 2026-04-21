@@ -51,14 +51,6 @@ async function uploadToReplicate(base64, token) {
   return data.urls?.get || data.url;
 }
 
-// ─── Download output URL to base64 ───────────────────────────
-async function base64FromUrl(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to download result: ${res.status}`);
-  const buffer = await res.arrayBuffer();
-  const ct     = res.headers.get('content-type') || 'image/jpeg';
-  return `data:${ct};base64,${Buffer.from(buffer).toString('base64')}`;
-}
 
 export default async function handler(req, res) {
   Object.entries(CORS).forEach(([k, v]) => res.setHeader(k, v));
@@ -85,33 +77,39 @@ export default async function handler(req, res) {
         uploadToReplicate(sourceImageBase64, token),
       ]);
 
-      const predRes = await fetch('https://api.replicate.com/v1/models/codeplugtech/face-swap/predictions', {
+      const predRes = await fetch('https://api.replicate.com/v1/predictions', {
         method:  'POST',
         headers: {
-          'Content-Type':      'application/json',
-          'Authorization':     `Bearer ${token}`,
-          'Prefer':            'wait=30',
-          'Replicate-Version': 'latest',
+          'Authorization': `Bearer ${token}`,
+          'Content-Type':  'application/json',
+          'Prefer':        'wait=30',
         },
         body: JSON.stringify({
+          version: '278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34',
           input: {
-            target_image: targetUrl,  // escena — donde va la cara
-            swap_image:   sourceUrl,  // cara del usuario
+            input_image: targetUrl,  // escena — donde va la cara
+            swap_image:  sourceUrl,  // cara del usuario
           },
         }),
       });
 
       const pred = await predRes.json().catch(() => ({}));
       if (!predRes.ok)
-        return res.status(predRes.status).json({ error: pred.detail || pred.error || predRes.statusText });
+        return res.status(predRes.status).json({ error: pred?.detail || pred?.error || predRes.statusText });
+
+      console.log('[faceswap/swap] Predicción:', pred.id, '| Status:', pred.status);
+
+      const getImageBase64 = async (outputUrl) => {
+        const imgRes = await fetch(outputUrl);
+        const imgBuf = await imgRes.arrayBuffer();
+        return `data:image/png;base64,${Buffer.from(imgBuf).toString('base64')}`;
+      };
 
       if (pred.status === 'succeeded' && pred.output) {
-        const imageBase64 = await base64FromUrl(pred.output);
-        return res.status(200).json({ imageBase64 });
+        const b64 = await getImageBase64(pred.output);
+        console.log('[faceswap/swap] ✓ Completado sincrónicamente');
+        return res.status(200).json({ imageBase64: b64, predictionId: pred.id });
       }
-
-      if (pred.status === 'failed')
-        return res.status(200).json({ error: pred.error || 'Face swap failed' });
 
       return res.status(200).json({ predictionId: pred.id, status: pred.status });
 
@@ -141,8 +139,11 @@ export default async function handler(req, res) {
         return res.status(pollRes.status).json({ error: pred.detail || pollRes.statusText });
 
       if (pred.status === 'succeeded' && pred.output) {
-        const imageBase64 = await base64FromUrl(pred.output);
-        return res.status(200).json({ imageBase64, status: 'succeeded' });
+        const imgRes = await fetch(pred.output);
+        const imgBuf = await imgRes.arrayBuffer();
+        const b64    = `data:image/png;base64,${Buffer.from(imgBuf).toString('base64')}`;
+        console.log('[faceswap/poll] ✓ Completado');
+        return res.status(200).json({ imageBase64: b64, status: 'succeeded' });
       }
 
       if (pred.status === 'failed')
