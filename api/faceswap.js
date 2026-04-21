@@ -88,12 +88,16 @@ export default async function handler(req, res) {
       const predRes = await fetch('https://api.replicate.com/v1/models/codeplugtech/face-swap/predictions', {
         method:  'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization:  `Bearer ${token}`,
-          Prefer:         'wait=30',
+          'Content-Type':      'application/json',
+          'Authorization':     `Bearer ${token}`,
+          'Prefer':            'wait=30',
+          'Replicate-Version': 'latest',
         },
         body: JSON.stringify({
-          input: { input_image: targetUrl, swap_image: sourceUrl },
+          input: {
+            target_image: targetUrl,  // escena — donde va la cara
+            swap_image:   sourceUrl,  // cara del usuario
+          },
         }),
       });
 
