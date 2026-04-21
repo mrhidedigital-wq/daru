@@ -688,10 +688,58 @@ ${anchorNote}
       );
       console.log('[SB:apply] Prompt (first 300 chars):', prompt.slice(0, 300));
 
-      const result = await generateImageWithGemini(prompt, refImages, frame.resolution || '16:9');
+      let result = await generateImageWithGemini(prompt, refImages, frame.resolution || '16:9');
 
       console.log('[SB:apply] ✓ Image generated, length:', result?.length);
       console.log('[SB:apply] ═══════════════════════════════════════════');
+
+      if (subject.faceImage) {
+        console.log('[SB:faceswap] Etapa 2 — face swap Replicate...');
+        try {
+          const swapRes  = await fetch('/api/faceswap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action:            'swap',
+              targetImageBase64: result,
+              sourceImageBase64: subject.faceImage,
+            }),
+          });
+          const swapData = await swapRes.json();
+
+          if (swapData.imageBase64) {
+            console.log('[SB:faceswap] ✓ Completado sincrónicamente');
+            result = swapData.imageBase64;
+
+          } else if (swapData.predictionId) {
+            console.log('[SB:faceswap] Polleando:', swapData.predictionId);
+            for (let i = 0; i < 20; i++) {
+              await new Promise(r => setTimeout(r, 3000));
+              const pollRes  = await fetch('/api/faceswap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'poll', predictionId: swapData.predictionId }),
+              });
+              const pollData = await pollRes.json();
+              console.log(`[SB:faceswap] Poll ${i+1}/20:`, pollData.status);
+              if (pollData.imageBase64) {
+                result = pollData.imageBase64;
+                console.log('[SB:faceswap] ✓ Face swap exitoso');
+                break;
+              }
+              if (pollData.status === 'failed') {
+                console.warn('[SB:faceswap] Falló:', pollData.error);
+                break;
+              }
+            }
+          } else {
+            console.warn('[SB:faceswap] Error:', swapData.error);
+          }
+        } catch (err) {
+          console.warn('[SB:faceswap] Fallback a Gemini:', err.message);
+        }
+        // Si falla por cualquier razón, result sigue siendo la imagen de Gemini
+      }
 
       updateFrame(activeFrameId, {
         generatedImage: result,

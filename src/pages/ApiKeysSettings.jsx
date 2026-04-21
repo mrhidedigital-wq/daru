@@ -70,6 +70,13 @@ const STATIC_KEYS = [
         placeholder: 'AIzaSy...',
         link:        'https://aistudio.google.com/apikey',
       },
+      {
+        keyName:     'replicate_api_key',
+        label:       'REPLICATE API KEY',
+        description: 'Replicate — face swap profesional InsightFace (no comercial)',
+        placeholder: 'r8_...',
+        link:        'https://replicate.com/account/api-tokens',
+      },
     ],
   },
 ];
@@ -187,6 +194,7 @@ export default function ApiKeysSettings() {
     byteplus_api_key:     '',
     piapi_api_key:        '',
     gemini_api_key:       '',
+    replicate_api_key:    '',
     google_cloud_project: '',
     vertex_access_token:  '',
   });

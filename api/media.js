@@ -1,15 +1,10 @@
-// api/media.js
-// Vercel Serverless Function — proxy consolidado para operaciones de video/media.
-// body.action === 'export'    → exporta proyecto concatenando shots (via Supabase Edge Fn)
-// body.action === 'finalize'  → normaliza + sube video a Supabase Storage (requiere FFmpeg)
-
-export const config = { maxDuration: 300 };
-
 import fs   from 'fs';
 import path from 'path';
 import os   from 'os';
 import { exec } from 'child_process';
 import { createClient } from '@supabase/supabase-js';
+
+export const config = { maxDuration: 300 };
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
