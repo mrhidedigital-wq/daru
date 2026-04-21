@@ -533,6 +533,11 @@ EXPRESSIONS & EMOTIONS:
       const identityAnchor = frame.referenceImage;
 
       const turnaroundFrontal = subject.turnaround?.frontal || null;
+      console.log('[SB:apply] DEBUG priority check:', {
+        hasFaceImage: !!subject.faceImage,
+        hasTurnaroundFrontal: !!turnaroundFrontal,
+        willUseFaceImage: !!subject.faceImage,
+      });
       // Prioridad: faceImage (reciente) > turnaround (viejo) > nada
       const characterRef = subject.faceImage || turnaroundFrontal || null;
       const hasFaceOnly = !!subject.faceImage;
@@ -582,30 +587,39 @@ Replace "${subject.label}" in the scene with this new character.
       } else {
         const faceInstr = hasFaceOnly
           ? `
-CRITICAL FACE REPLACEMENT — "${subject.label}":
+═══ FACE SWAP INSTRUCTION (HIGHEST PRIORITY) ═══
 
-You MUST replace the face of "${subject.label}" in the FIRST image
-with the face shown in the SECOND image. This is NOT optional.
+You are performing a surgical face swap on "${subject.label}".
 
-WHAT TO CHANGE:
-- Only the facial features: eyes, nose, mouth, face shape, skin tone
-- Match the SECOND image's face identity exactly
+INPUT IMAGES:
+- FIRST image: the scene with "${subject.label}" in it (source body)
+- SECOND image: a portrait showing the NEW face to apply
 
-WHAT TO PRESERVE FROM THE FIRST IMAGE (mandatory):
-- Body proportions: height, build, shoulder width, body type — IDENTICAL
-- Hair: style, color, length — unless the new face image has clearly different hair
-- Clothing: every garment, color, and detail — EXACT
-- Pose: body position, arm placement, head tilt — EXACT
-- Position in scene: same spot, same scale relative to other characters
-- Head size relative to body: MUST remain proportional to the original body
+YOUR TASK:
+Replace ONLY the face region of "${subject.label}" with the face from
+the SECOND image. Treat this like a professional VFX face replacement.
 
-The result must look like the SAME body from the first image but with
-the face from the second image. Like a seamless face swap in VFX —
-not a new person pasted on top.
+MUST PRESERVE FROM FIRST IMAGE (non-negotiable):
+✓ Body height, build, and proportions — DO NOT rescale the body
+✓ Head size relative to body — DO NOT enlarge or shrink the head
+✓ Hair style, color, and length — keep as in the scene
+✓ Clothing — every single garment, exactly as shown
+✓ Pose and body position — identical
+✓ Scale and placement in the frame — identical
+✓ Skin tone of the neck/arms — blend naturally with the new face
 
-DO NOT scale the head up or down.
-DO NOT change body dimensions.
-DO NOT shift the character's position.
+MUST TAKE FROM SECOND IMAGE:
+✓ Facial features: eyes shape, nose, mouth, jaw line, cheekbones
+✓ Face identity: it must be recognizably the same person as the portrait
+
+FORBIDDEN:
+✗ Do NOT resize or reposition the character
+✗ Do NOT replace the full body
+✗ Do NOT change the clothing
+✗ Do NOT crop or zoom the scene
+
+If you cannot do a clean face swap, return the FIRST image unchanged
+rather than creating a deformed result.
           `.trim()
           : `Keep the face of "${subject.label}" exactly as in the reference image.`;
 
