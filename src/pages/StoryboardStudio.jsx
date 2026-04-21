@@ -532,11 +532,11 @@ EXPRESSIONS & EMOTIONS:
       const sceneBase = frame.generatedImage || frame.referenceImage;
       const identityAnchor = frame.referenceImage;
 
-      // Priority: turnaround frontal > faceImage > nothing
       const turnaroundFrontal = subject.turnaround?.frontal || null;
-      const characterRef = turnaroundFrontal || subject.faceImage || null;
-      const hasTurnaround = !!turnaroundFrontal;
-      const hasFaceOnly = !turnaroundFrontal && !!subject.faceImage;
+      // Prioridad: faceImage (reciente) > turnaround (viejo) > nada
+      const characterRef = subject.faceImage || turnaroundFrontal || null;
+      const hasFaceOnly = !!subject.faceImage;
+      const hasTurnaround = !subject.faceImage && !!turnaroundFrontal;
 
       const refImages = [
         sceneBase,
@@ -555,6 +555,7 @@ EXPRESSIONS & EMOTIONS:
       console.log('  - costumeImage:', subject.costumeImage ? '✓' : '✗');
       console.log('  - customDescription:', subject.customDescription || '(none)');
       console.log('  - turnaroundFrontal:', turnaroundFrontal ? '✓' : '✗');
+      console.log('  - PRIORITY:', subject.faceImage ? 'FACE_IMAGE (user upload wins)' : turnaroundFrontal ? 'TURNAROUND' : 'NONE');
 
       const styleInstruction = frame.styleMode === 'animation'
         ? 'Maintain the exact animation/illustration style. Do NOT make it photorealistic.'
@@ -581,11 +582,30 @@ Replace "${subject.label}" in the scene with this new character.
       } else {
         const faceInstr = hasFaceOnly
           ? `
-FACE REPLACEMENT — "${subject.label}":
-- Take the face from the SECOND image and apply it to "${subject.label}"
-- The new face must match: head angle, lighting, skin tone of the scene
-- DO NOT change: body, hair style (unless the face image shows different hair), pose, position, clothing
-- This is a surgical face swap, not a full character change
+CRITICAL FACE REPLACEMENT — "${subject.label}":
+
+You MUST replace the face of "${subject.label}" in the FIRST image
+with the face shown in the SECOND image. This is NOT optional.
+
+WHAT TO CHANGE:
+- Only the facial features: eyes, nose, mouth, face shape, skin tone
+- Match the SECOND image's face identity exactly
+
+WHAT TO PRESERVE FROM THE FIRST IMAGE (mandatory):
+- Body proportions: height, build, shoulder width, body type — IDENTICAL
+- Hair: style, color, length — unless the new face image has clearly different hair
+- Clothing: every garment, color, and detail — EXACT
+- Pose: body position, arm placement, head tilt — EXACT
+- Position in scene: same spot, same scale relative to other characters
+- Head size relative to body: MUST remain proportional to the original body
+
+The result must look like the SAME body from the first image but with
+the face from the second image. Like a seamless face swap in VFX —
+not a new person pasted on top.
+
+DO NOT scale the head up or down.
+DO NOT change body dimensions.
+DO NOT shift the character's position.
           `.trim()
           : `Keep the face of "${subject.label}" exactly as in the reference image.`;
 
