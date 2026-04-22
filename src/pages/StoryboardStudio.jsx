@@ -533,15 +533,20 @@ EXPRESSIONS & EMOTIONS:
       const identityAnchor = frame.referenceImage;
 
       const turnaroundFrontal = subject.turnaround?.frontal || null;
+      const hasBothFaceAndTurnaround = !!subject.faceImage && !!turnaroundFrontal;
       console.log('[SB:apply] DEBUG priority check:', {
         hasFaceImage: !!subject.faceImage,
         hasTurnaroundFrontal: !!turnaroundFrontal,
-        willUseFaceImage: !!subject.faceImage,
+        hasBoth: hasBothFaceAndTurnaround,
       });
-      // Prioridad: faceImage (reciente) > turnaround (viejo) > nada
-      const characterRef = subject.faceImage || turnaroundFrontal || null;
-      const hasFaceOnly = !!subject.faceImage;
-      const hasTurnaround = !subject.faceImage && !!turnaroundFrontal;
+      // Cuando hay AMBOS: Gemini usa turnaround como body ref → Replicate aplica la cara
+      // Cuando solo faceImage: Gemini FACE_SWAP → Replicate aplica la cara
+      // Cuando solo turnaround: Gemini FULL_BODY_TURNAROUND → no Replicate
+      const characterRef = hasBothFaceAndTurnaround
+        ? turnaroundFrontal                                // turnaround como body para Gemini
+        : (subject.faceImage || turnaroundFrontal || null);
+      const hasFaceOnly  = !turnaroundFrontal && !!subject.faceImage;
+      const hasTurnaround = !!turnaroundFrontal;           // true si hay turnaround (solo o con cara)
 
       const refImages = [
         sceneBase,
@@ -632,10 +637,11 @@ Keep the face identity intact.
           `.trim()
           : `Keep the exact facial expression of "${subject.label}" as in the reference.`;
 
+        const costumeOrdinal = characterRef ? 'THIRD' : 'SECOND';
         const costumeInstr = (!subject.keepCostume && subject.costumeImage)
           ? `
 COSTUME REPLACEMENT — "${subject.label}":
-The THIRD image shows the new costume.
+The ${costumeOrdinal} image shows the new costume.
 Replace the clothing of "${subject.label}" with this costume.
 Keep body shape, pose, and position identical.
           `.trim()
@@ -675,7 +681,7 @@ KEEP IDENTICAL: background, lighting, composition, shot type, all props, visual 
 
 The FIRST image is the current scene (base composition).
 ${characterRef ? (hasTurnaround ? 'The SECOND image is the FULL BODY CHARACTER to insert into the scene.' : 'The SECOND image is the NEW FACE to apply.') : ''}
-${(!subject.keepCostume && subject.costumeImage) ? 'The THIRD image is the NEW COSTUME to apply.' : ''}
+${(!subject.keepCostume && subject.costumeImage) ? `The ${costumeOrdinal} image is the NEW COSTUME to apply.` : ''}
 ${anchorNote}
       `.trim();
 

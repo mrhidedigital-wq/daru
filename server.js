@@ -333,9 +333,31 @@ app.post('/api/video/finalize', async (req, res) => {
   }
 });
 
+// ── Helper: poll a Veo LRO until done (server-side) ─────────
+async function pollVeoOperationUntilDone(operationName, accessToken, intervalMs = 5000, maxAttempts = 72) {
+  const parts = operationName.match(/^(projects\/[^/]+\/locations\/[^/]+\/publishers\/[^/]+\/models\/[^/]+)\/operations\/(.+)$/);
+  if (!parts) throw new Error(`[veo] Invalid operationName format: ${operationName}`);
+
+  const fetchUrl = `https://us-central1-aiplatform.googleapis.com/v1/${parts[1]}:fetchPredictOperation`;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const pollRes = await fetch(fetchUrl, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operationName }),
+    });
+    const data = await pollRes.json().catch(() => ({}));
+    if (!pollRes.ok) throw new Error(data?.error?.message || `fetchPredictOperation failed: ${pollRes.status}`);
+    if (data.done) return data;
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  throw new Error('[veo] Operation timed out after polling');
+}
+
 // ── POST /api/veo/generate ──────────────────────────────────
 // Proxy para Veo 3.1 via Vertex AI (evita CORS del browser)
 // Body: { body, projectId, accessToken }
+// Retries up to 5 times if Veo 3.1 returns a false-positive RAI filter.
 // ─────────────────────────────────────────────────────────────
 
 app.post('/api/veo/generate', async (req, res) => {
@@ -345,34 +367,53 @@ app.post('/api/veo/generate', async (req, res) => {
     return res.status(400).json({ error: 'projectId, accessToken, and body are required' });
   }
 
-  try {
-    // ⚠️ Migrado de veo-3.1-generate-preview (deprecated 2 abril 2026) al endpoint GA
-    const endpoint = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:predictLongRunning`;
+  // ⚠️ Migrado de veo-3.1-generate-preview (deprecated 2 abril 2026) al endpoint GA
+  const endpoint = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:predictLongRunning`;
 
-    console.log(`[veo] Starting video generation for project ${projectId}`);
+  const MAX_ATTEMPTS = 5;
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(veoBody),
-    });
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      console.log(`[veo] Attempt ${attempt} of ${MAX_ATTEMPTS} — starting video generation for project ${projectId}`);
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      console.error(`[veo] Generate error:`, err);
-      return res.status(response.status).json({ error: err?.error?.message || response.statusText });
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(veoBody),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        console.error(`[veo] Generate error:`, err);
+        return res.status(response.status).json({ error: err?.error?.message || response.statusText });
+      }
+
+      const operation = await response.json();
+      console.log(`[veo] Operation started: ${operation.name}`);
+
+      const pollResult = await pollVeoOperationUntilDone(operation.name, accessToken);
+
+      const raiCount = pollResult.response?.raiMediaFilteredCount || 0;
+      if (raiCount > 0) {
+        console.log(`[veo] Attempt ${attempt} of ${MAX_ATTEMPTS} — RAI filtered, retrying...`);
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+        return res.status(500).json({ error: 'Veo RAI filter triggered on all 5 attempts. The request was consistently blocked — try rephrasing the prompt.' });
+      }
+
+      return res.json({ ...operation, done: true, response: pollResult.response });
+
+    } catch (err) {
+      console.error(`[veo] Attempt ${attempt} error:`, err.message);
+      if (attempt === MAX_ATTEMPTS) {
+        return res.status(500).json({ error: err.message });
+      }
     }
-
-    const operation = await response.json();
-    console.log(`[veo] Operation started: ${operation.name}`);
-    res.json(operation);
-
-  } catch (err) {
-    console.error(`[veo] Error:`, err.message);
-    res.status(500).json({ error: err.message });
   }
 });
 
