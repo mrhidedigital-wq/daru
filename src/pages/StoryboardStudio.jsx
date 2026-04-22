@@ -546,7 +546,9 @@ EXPRESSIONS & EMOTIONS:
         ? turnaroundFrontal                                // turnaround como body para Gemini
         : (subject.faceImage || turnaroundFrontal || null);
       const hasFaceOnly  = !turnaroundFrontal && !!subject.faceImage;
-      const hasTurnaround = !!turnaroundFrontal;           // true si hay turnaround (solo o con cara)
+      const hasTurnaround = !!turnaroundFrontal; 
+      const costumeOrdinal = characterRef ? 'THIRD' : 'SECOND';
+          // true si hay turnaround (solo o con cara)
 
       const refImages = [
         sceneBase,
